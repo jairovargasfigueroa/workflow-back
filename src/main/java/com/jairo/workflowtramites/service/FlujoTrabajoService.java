@@ -111,7 +111,8 @@ public class FlujoTrabajoService {
         if (flujo.getXmlBorrador() == null || flujo.getXmlBorrador().isBlank())
             throw new RuntimeException("No hay borrador para publicar");
 
-        String xmlFinal = bpmnParserService.inyectarCondiciones(flujo.getXmlBorrador());
+        String xmlConCondiciones = bpmnParserService.inyectarCondiciones(flujo.getXmlBorrador());
+        String xmlFinal = bpmnParserService.inyectarCandidateGroupsDesdeLanes(xmlConCondiciones);
 
         List<String> errores = bpmnParserService.validar(xmlFinal);
         if (!errores.isEmpty())

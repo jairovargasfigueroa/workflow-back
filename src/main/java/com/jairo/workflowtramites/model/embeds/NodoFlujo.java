@@ -17,6 +17,8 @@ public class NodoFlujo {
     private String tipo;
     private String nombre;
     private String departamentoId;
+    private String carrilId;
+    private String carrilNombre;
     private String formularioId;
     private List<CampoFormulario> camposFormulario;
     private List<TransicionFlujo> transiciones;

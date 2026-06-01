@@ -54,9 +54,12 @@ public class VersionFlujoMapper {
                 .tipo(n.getTipo())
                 .nombre(n.getNombre())
                 .departamentoId(n.getDepartamentoId())
+                .carrilId(n.getCarrilId())
+                .carrilNombre(n.getCarrilNombre())
                 .formularioId(n.getFormularioId())
                 .camposFormulario(n.getCamposFormulario())
                 .transiciones(toTransicionesResponse(n.getTransiciones()))
+                .configuracionDocumental(n.getConfiguracionDocumental())
                 .build();
     }
 

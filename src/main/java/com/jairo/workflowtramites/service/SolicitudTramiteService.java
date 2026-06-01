@@ -364,6 +364,8 @@ public class SolicitudTramiteService {
                     .elementId(entrada.getElementId())
                     .departamentoId(departamentoId)
                     .departamentoNombre(entrada.getDepartamentoNombre())
+                    .carrilId(nodo.getCarrilId())
+                    .carrilNombre(nodo.getCarrilNombre())
                     .campos(campos)
                     .acciones(resolverAcciones(nodo, version))
                     .build();

@@ -1,7 +1,10 @@
 package com.jairo.workflowtramites.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jairo.workflowtramites.model.embeds.ConfiguracionDocumental;
 import com.jairo.workflowtramites.model.embeds.NodoFlujo;
 import com.jairo.workflowtramites.model.embeds.TransicionFlujo;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -24,15 +27,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+@Slf4j
 @Service
 public class BpmnParserService {
 
     private static final String NS_CAMUNDA = "http://camunda.org/schema/1.0/bpmn";
     private static final List<String> TIPOS_NODO = List.of("startEvent", "endEvent", "userTask", "exclusiveGateway", "parallelGateway");
+    private static final String PROP_DEPARTAMENTO_ID = "departamentoId";
+    private static final String PROP_CONFIGURACION_DOCUMENTAL = "configuracionDocumental";
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public List<NodoFlujo> parsear(String xml) {
         Document doc = parsearXml(xml);
         Map<String, List<TransicionFlujo>> transicionesPorOrigen = construirMapaTransiciones(doc);
+        Map<String, InfoCarril> carrilesPorNodo = extraerInfoCarrilesPorNodo(doc);
         List<NodoFlujo> nodos = new ArrayList<>();
 
         for (String tipo : TIPOS_NODO) {
@@ -44,9 +53,24 @@ public class BpmnParserService {
 
                 String departamentoId = null;
                 String formularioId = null;
+                String carrilId = null;
+                String carrilNombre = null;
+                ConfiguracionDocumental configuracionDocumental = null;
+
+                InfoCarril infoCarril = carrilesPorNodo.get(elementId);
+                if (infoCarril != null) {
+                    carrilId = infoCarril.id;
+                    carrilNombre = infoCarril.nombre;
+                }
+
                 if ("userTask".equals(tipo)) {
-                    departamentoId = obtenerAtributoCamunda(el, "candidateGroups");
+                    if (infoCarril != null && infoCarril.departamentoId != null) {
+                        departamentoId = infoCarril.departamentoId;
+                    } else {
+                        departamentoId = obtenerAtributoCamunda(el, "candidateGroups");
+                    }
                     formularioId = obtenerAtributoCamunda(el, "formKey");
+                    configuracionDocumental = extraerConfiguracionDocumental(el);
                 }
 
                 nodos.add(NodoFlujo.builder()
@@ -54,7 +78,10 @@ public class BpmnParserService {
                         .tipo(tipo)
                         .nombre(nombre.isBlank() ? elementId : nombre)
                         .departamentoId(departamentoId)
+                        .carrilId(carrilId)
+                        .carrilNombre(carrilNombre)
                         .formularioId(formularioId)
+                        .configuracionDocumental(configuracionDocumental)
                         .transiciones(transicionesPorOrigen.getOrDefault(elementId, List.of()))
                         .build());
             }
@@ -62,17 +89,88 @@ public class BpmnParserService {
         return nodos;
     }
 
+    private Map<String, InfoCarril> extraerInfoCarrilesPorNodo(Document doc) {
+        Map<String, InfoCarril> mapa = new HashMap<>();
+        NodeList lanes = doc.getElementsByTagNameNS("*", "lane");
+
+        for (int i = 0; i < lanes.getLength(); i++) {
+            Element lane = (Element) lanes.item(i);
+            String carrilId = lane.getAttribute("id");
+            String carrilNombre = lane.getAttribute("name");
+            String departamentoId = obtenerDepartamentoIdDelCarril(lane);
+
+            InfoCarril info = new InfoCarril();
+            info.id = carrilId;
+            info.nombre = carrilNombre.isBlank() ? carrilId : carrilNombre;
+            info.departamentoId = departamentoId;
+
+            NodeList refs = lane.getElementsByTagNameNS("*", "flowNodeRef");
+            for (int j = 0; j < refs.getLength(); j++) {
+                String elementId = refs.item(j).getTextContent().trim();
+                if (!elementId.isBlank()) {
+                    mapa.put(elementId, info);
+                }
+            }
+        }
+        return mapa;
+    }
+
+    private String obtenerDepartamentoIdDelCarril(Element lane) {
+        return obtenerValorPropiedadCamunda(lane, PROP_DEPARTAMENTO_ID);
+    }
+
+    private String obtenerValorPropiedadCamunda(Element el, String nombrePropiedad) {
+        NodeList propiedades = el.getElementsByTagNameNS(NS_CAMUNDA, "property");
+        for (int i = 0; i < propiedades.getLength(); i++) {
+            Element prop = (Element) propiedades.item(i);
+            if (nombrePropiedad.equals(prop.getAttribute("name"))) {
+                String valor = prop.getAttribute("value");
+                if (valor != null && !valor.isBlank()) return valor;
+            }
+        }
+        return null;
+    }
+
+    private ConfiguracionDocumental extraerConfiguracionDocumental(Element userTask) {
+        String json = obtenerValorPropiedadCamunda(userTask, PROP_CONFIGURACION_DOCUMENTAL);
+        if (json == null || json.isBlank()) return null;
+        try {
+            return objectMapper.readValue(json, ConfiguracionDocumental.class);
+        } catch (Exception e) {
+            log.warn("No se pudo deserializar configuracionDocumental del nodo '{}': {}",
+                    userTask.getAttribute("id"), e.getMessage());
+            return null;
+        }
+    }
+
+    private static class InfoCarril {
+        String id;
+        String nombre;
+        String departamentoId;
+    }
+
     public List<String> validar(String xml) {
         List<String> errores = new ArrayList<>();
         try {
             Document doc = parsearXml(xml);
             Map<String, List<TransicionFlujo>> transicionesPorOrigen = construirMapaTransiciones(doc);
+            Map<String, InfoCarril> carrilesPorNodo = extraerInfoCarrilesPorNodo(doc);
 
             if (doc.getElementsByTagNameNS("*", "startEvent").getLength() == 0)
                 errores.add("El diagrama no tiene evento de inicio");
 
             if (doc.getElementsByTagNameNS("*", "endEvent").getLength() == 0)
                 errores.add("El diagrama no tiene evento de fin");
+
+            NodeList lanes = doc.getElementsByTagNameNS("*", "lane");
+            for (int i = 0; i < lanes.getLength(); i++) {
+                Element lane = (Element) lanes.item(i);
+                String nombreLane = lane.getAttribute("name");
+                String etiquetaLane = nombreLane.isBlank() ? lane.getAttribute("id") : nombreLane;
+                if (obtenerDepartamentoIdDelCarril(lane) == null) {
+                    errores.add("El carril '" + etiquetaLane + "' no tiene departamento asignado");
+                }
+            }
 
             Set<String> elementosConEntrada = new HashSet<>();
             NodeList flujos = doc.getElementsByTagNameNS("*", "sequenceFlow");
@@ -86,8 +184,12 @@ public class BpmnParserService {
                 String elementId = tarea.getAttribute("id");
                 String etiqueta = label(tarea);
 
-                if (obtenerAtributoCamunda(tarea, "candidateGroups") == null)
-                    errores.add("La tarea '" + etiqueta + "' no tiene departamento asignado");
+                InfoCarril infoCarril = carrilesPorNodo.get(elementId);
+                boolean tieneDeptoEnCarril = infoCarril != null && infoCarril.departamentoId != null;
+                boolean tieneDeptoDirecto = obtenerAtributoCamunda(tarea, "candidateGroups") != null;
+
+                if (!tieneDeptoEnCarril && !tieneDeptoDirecto)
+                    errores.add("La tarea '" + etiqueta + "' no tiene departamento asignado (ni por carril ni directo)");
 
                 if (obtenerAtributoCamunda(tarea, "formKey") == null)
                     errores.add("La tarea '" + etiqueta + "' no tiene formulario asignado");
@@ -131,6 +233,30 @@ public class BpmnParserService {
             errores.add("El XML no es un BPMN válido: " + e.getMessage());
         }
         return errores;
+    }
+
+    public String inyectarCandidateGroupsDesdeLanes(String xml) {
+        Document doc = parsearXml(xml);
+        Map<String, InfoCarril> carrilesPorNodo = extraerInfoCarrilesPorNodo(doc);
+        if (carrilesPorNodo.isEmpty()) return xml;
+
+        NodeList tareas = doc.getElementsByTagNameNS("*", "userTask");
+        boolean modificado = false;
+
+        for (int i = 0; i < tareas.getLength(); i++) {
+            Element tarea = (Element) tareas.item(i);
+            String elementId = tarea.getAttribute("id");
+
+            if (obtenerAtributoCamunda(tarea, "candidateGroups") != null) continue;
+
+            InfoCarril infoCarril = carrilesPorNodo.get(elementId);
+            if (infoCarril == null || infoCarril.departamentoId == null) continue;
+
+            tarea.setAttributeNS(NS_CAMUNDA, "camunda:candidateGroups", infoCarril.departamentoId);
+            modificado = true;
+        }
+
+        return modificado ? serializarXml(doc) : xml;
     }
 
     public String inyectarCondiciones(String xml) {
