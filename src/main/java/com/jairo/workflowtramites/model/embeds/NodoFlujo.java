@@ -20,4 +20,5 @@ public class NodoFlujo {
     private String formularioId;
     private List<CampoFormulario> camposFormulario;
     private List<TransicionFlujo> transiciones;
+    private ConfiguracionDocumental configuracionDocumental;
 }

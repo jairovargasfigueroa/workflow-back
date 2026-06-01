@@ -52,6 +52,8 @@ public class SolicitudTramiteService {
     private final DepartamentoService departamentoService;
     private final FormularioTemplateService formularioTemplateService;
     private final MongoTemplate mongoTemplate;
+    private final com.jairo.workflowtramites.repository.ArchivoRepository archivoRepository;
+    private final com.jairo.workflowtramites.repository.VersionFlujoRepository versionFlujoRepository;
 
     public List<SolicitudTramiteResumen> listar() {
         return solicitudTramiteRepository.findAll()
@@ -202,6 +204,8 @@ public class SolicitudTramiteService {
             throw new IllegalStateException(
                     "La tarea está asignada a otro funcionario");
         }
+
+        validarDocumentosObligatoriosDelNodo(solicitud, entrada.getElementId());
 
         entrada.setFuncionarioId(entrada.getFuncionarioAsignadoId());
         entrada.setFuncionarioNombre(entrada.getFuncionarioAsignadoNombre());
@@ -385,6 +389,55 @@ public class SolicitudTramiteService {
                         .valor(t.getValor())
                         .build())
                 .toList();
+    }
+
+    private void validarDocumentosObligatoriosDelNodo(SolicitudTramite solicitud, String elementId) {
+        if (solicitud.getVersionFlujoId() == null) return;
+
+        com.jairo.workflowtramites.model.VersionFlujo version = versionFlujoRepository.findById(solicitud.getVersionFlujoId()).orElse(null);
+        if (version == null || version.getNodos() == null) return;
+
+        com.jairo.workflowtramites.model.embeds.NodoFlujo nodo = version.getNodos().stream()
+                .filter(n -> elementId.equals(n.getElementId()))
+                .findFirst()
+                .orElse(null);
+
+        if (nodo == null || nodo.getConfiguracionDocumental() == null) return;
+
+        var documentosProducidos = nodo.getConfiguracionDocumental().getDocumentosProducidos();
+        if (documentosProducidos == null || documentosProducidos.isEmpty()) return;
+
+        List<String> faltantes = new ArrayList<>();
+        for (var docConfig : documentosProducidos) {
+            if (!docConfig.isObligatorio()) continue;
+            String campo = docConfig.getCampoFormularioAsociado();
+            if (campo == null) continue;
+
+            boolean existe = !archivoRepository.findBySolicitudIdAndCampoFormularioOrigenAndEstado(
+                    solicitud.getId(), campo, com.jairo.workflowtramites.model.Archivo.EstadoArchivo.ACTIVO
+            ).isEmpty();
+
+            if (!existe) {
+                faltantes.add(docConfig.getNombre());
+            }
+        }
+
+        if (!faltantes.isEmpty()) {
+            throw new RuntimeException("Faltan documentos obligatorios para completar este paso: " + String.join(", ", faltantes));
+        }
+
+        for (var docConfig : documentosProducidos) {
+            if (!docConfig.isInmutablePostCierre()) continue;
+            String campo = docConfig.getCampoFormularioAsociado();
+            if (campo == null) continue;
+
+            archivoRepository.findBySolicitudIdAndCampoFormularioOrigenAndEstado(
+                    solicitud.getId(), campo, com.jairo.workflowtramites.model.Archivo.EstadoArchivo.ACTIVO
+            ).forEach(a -> {
+                a.setInmutable(true);
+                archivoRepository.save(a);
+            });
+        }
     }
 
     private Map<String, String> obtenerFormulariosPorElementId(String versionId) {
