@@ -11,10 +11,20 @@ public class RestClientConfig {
     @Value("${analytics.service.url}")
     private String analyticsServiceUrl;
 
+    @Value("${reportes.service.url}")
+    private String reportesServiceUrl;
+
     @Bean
     public RestClient analyticsRestClient(RestClient.Builder builder) {
         return builder
                 .baseUrl(analyticsServiceUrl)
+                .build();
+    }
+
+    @Bean
+    public RestClient reportesRestClient(RestClient.Builder builder) {
+        return builder
+                .baseUrl(reportesServiceUrl)
                 .build();
     }
 }
