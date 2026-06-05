@@ -16,6 +16,7 @@ public class TramiteMapper {
                 .formularioSolicitanteId(t.getFormularioSolicitanteId())
                 .flujoTrabajoId(t.getFlujoTrabajoId())
                 .requisitos(t.getRequisitos())
+                .etiquetas(t.getEtiquetas())
                 .activo(t.isActivo())
                 .fechaCreacion(t.getFechaCreacion())
                 .build();
@@ -28,6 +29,7 @@ public class TramiteMapper {
                 .formularioSolicitanteId(r.getFormularioSolicitanteId())
                 .flujoTrabajoId(r.getFlujoTrabajoId())
                 .requisitos(r.getRequisitos() != null ? r.getRequisitos() : new ArrayList<>())
+                .etiquetas(r.getEtiquetas() != null ? r.getEtiquetas() : new ArrayList<>())
                 .activo(true)
                 .build();
     }

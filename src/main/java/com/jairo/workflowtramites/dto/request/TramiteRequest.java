@@ -22,4 +22,6 @@ public class TramiteRequest {
     private String flujoTrabajoId;
 
     private List<String> requisitos;
+
+    private List<String> etiquetas;
 }

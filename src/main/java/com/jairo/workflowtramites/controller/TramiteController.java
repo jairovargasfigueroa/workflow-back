@@ -1,6 +1,8 @@
 package com.jairo.workflowtramites.controller;
 
 import com.jairo.workflowtramites.dto.request.TramiteRequest;
+import com.jairo.workflowtramites.dto.response.FormularioTemplateResponse;
+import com.jairo.workflowtramites.dto.response.TramiteDisponibleResponse;
 import com.jairo.workflowtramites.dto.response.TramiteResponse;
 import com.jairo.workflowtramites.service.TramiteService;
 import jakarta.validation.Valid;
@@ -43,5 +45,15 @@ public class TramiteController {
     public ResponseEntity<Void> eliminar(@PathVariable String id) {
         tramiteService.eliminar(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/disponibles")
+    public ResponseEntity<List<TramiteDisponibleResponse>> listarDisponibles() {
+        return ResponseEntity.ok(tramiteService.listarDisponibles());
+    }
+
+    @GetMapping("/{id}/formulario-solicitante")
+    public ResponseEntity<FormularioTemplateResponse> obtenerFormularioSolicitante(@PathVariable String id) {
+        return ResponseEntity.ok(tramiteService.obtenerFormularioSolicitante(id));
     }
 }

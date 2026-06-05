@@ -14,6 +14,9 @@ public class RestClientConfig {
     @Value("${reportes.service.url}")
     private String reportesServiceUrl;
 
+    @Value("${agente-tramites.service.url}")
+    private String agenteTramitesServiceUrl;
+
     @Bean
     public RestClient analyticsRestClient(RestClient.Builder builder) {
         return builder
@@ -25,6 +28,13 @@ public class RestClientConfig {
     public RestClient reportesRestClient(RestClient.Builder builder) {
         return builder
                 .baseUrl(reportesServiceUrl)
+                .build();
+    }
+
+    @Bean
+    public RestClient agenteTramitesRestClient(RestClient.Builder builder) {
+        return builder
+                .baseUrl(agenteTramitesServiceUrl)
                 .build();
     }
 }

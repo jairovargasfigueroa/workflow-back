@@ -27,5 +27,8 @@ public class Tramite extends AuditableDocument {
     @Builder.Default
     private List<String> requisitos = new ArrayList<>();
 
+    @Builder.Default
+    private List<String> etiquetas = new ArrayList<>();
+
     private boolean activo;
 }
