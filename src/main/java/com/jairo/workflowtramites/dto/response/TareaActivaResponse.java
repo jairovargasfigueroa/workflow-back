@@ -17,4 +17,9 @@ public class TareaActivaResponse {
     private String carrilNombre;
     private List<CampoFormulario> campos;
     private List<AccionDisponibleResponse> acciones;
+
+    // Documentos que el funcionario debe generar en este nodo (slots de subida).
+    // El front los renderiza separados del formulario; al subir, manda
+    // campoFormulario = nombre del documento producido.
+    private List<DocumentoProducidoSlotResponse> documentosProducidos;
 }

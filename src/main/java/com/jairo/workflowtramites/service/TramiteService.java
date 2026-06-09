@@ -52,6 +52,11 @@ public class TramiteService {
         if (request.getEtiquetas() != null) {
             existente.setEtiquetas(request.getEtiquetas());
         }
+        // SLA del trámite (opcionales)
+        existente.setPlazoObjetivoHoras(request.getPlazoObjetivoHoras());
+        existente.setPlazoMaximoHoras(request.getPlazoMaximoHoras());
+        existente.setUmbralAlertaPorcentaje(request.getUmbralAlertaPorcentaje());
+        existente.setCriticidad(request.getCriticidad());
 
         return TramiteMapper.toResponse(tramiteRepository.save(existente));
     }

@@ -125,10 +125,14 @@ public class ReportesService {
         long total = filtradas.size();
         int totalPaginas = (int) Math.ceil((double) total / tamano);
 
+        // Catalogo de departamentos para resolver los IDs de departamentosActuales a nombres.
+        Map<String, String> nombresDeptos = departamentoRepository.findAll().stream()
+                .collect(Collectors.toMap(Departamento::getId, Departamento::getNombre));
+
         List<SolicitudReporteResponse> contenido = filtradas.stream()
                 .skip((long) pagina * tamano)
                 .limit(tamano)
-                .map(ReportesMapper::toSolicitudReporteResponse)
+                .map(s -> ReportesMapper.toSolicitudReporteResponse(s, nombresDeptos))
                 .toList();
 
         return PaginaResponse.<SolicitudReporteResponse>builder()

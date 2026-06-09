@@ -1,5 +1,6 @@
 package com.jairo.workflowtramites.service;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jairo.workflowtramites.model.embeds.ConfiguracionDocumental;
 import com.jairo.workflowtramites.model.embeds.NodoFlujo;
@@ -35,8 +36,13 @@ public class BpmnParserService {
     private static final List<String> TIPOS_NODO = List.of("startEvent", "endEvent", "userTask", "exclusiveGateway", "parallelGateway");
     private static final String PROP_DEPARTAMENTO_ID = "departamentoId";
     private static final String PROP_CONFIGURACION_DOCUMENTAL = "configuracionDocumental";
+    private static final String PROP_SLA_NODO_HORAS = "slaNodoHoras";
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    // Tolerante a campos desconocidos en el JSON de configuracionDocumental
+    // (ej. campos viejos como "documentosEsperados" que el front aun pueda enviar).
+    // Sin esto, un campo extra hace fallar la deserializacion y se descarta TODA la config.
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public List<NodoFlujo> parsear(String xml) {
         Document doc = parsearXml(xml);
@@ -56,6 +62,7 @@ public class BpmnParserService {
                 String carrilId = null;
                 String carrilNombre = null;
                 ConfiguracionDocumental configuracionDocumental = null;
+                Integer slaNodoHoras = null;
 
                 InfoCarril infoCarril = carrilesPorNodo.get(elementId);
                 if (infoCarril != null) {
@@ -71,6 +78,11 @@ public class BpmnParserService {
                     }
                     formularioId = obtenerAtributoCamunda(el, "formKey");
                     configuracionDocumental = extraerConfiguracionDocumental(el);
+                    slaNodoHoras = extraerSlaNodoHoras(el);
+                } else if ("startEvent".equals(tipo)) {
+                    // El nodo inicial lleva los documentos que el SOLICITANTE sube al crear el
+                    // tramite (el "kit"). Misma estructura que documentosProducidos de un userTask.
+                    configuracionDocumental = extraerConfiguracionDocumental(el);
                 }
 
                 nodos.add(NodoFlujo.builder()
@@ -82,6 +94,7 @@ public class BpmnParserService {
                         .carrilNombre(carrilNombre)
                         .formularioId(formularioId)
                         .configuracionDocumental(configuracionDocumental)
+                        .slaNodoHoras(slaNodoHoras)
                         .transiciones(transicionesPorOrigen.getOrDefault(elementId, List.of()))
                         .build());
             }
@@ -139,6 +152,18 @@ public class BpmnParserService {
         } catch (Exception e) {
             log.warn("No se pudo deserializar configuracionDocumental del nodo '{}': {}",
                     userTask.getAttribute("id"), e.getMessage());
+            return null;
+        }
+    }
+
+    private Integer extraerSlaNodoHoras(Element userTask) {
+        String valor = obtenerValorPropiedadCamunda(userTask, PROP_SLA_NODO_HORAS);
+        if (valor == null || valor.isBlank()) return null;
+        try {
+            int horas = Integer.parseInt(valor.trim());
+            return horas > 0 ? horas : null;
+        } catch (NumberFormatException e) {
+            log.warn("slaNodoHoras inválido en nodo '{}': '{}'", userTask.getAttribute("id"), valor);
             return null;
         }
     }

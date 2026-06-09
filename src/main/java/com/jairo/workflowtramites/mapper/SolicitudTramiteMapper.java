@@ -26,6 +26,8 @@ public class SolicitudTramiteMapper {
                 .respuestasSolicitante(s.getRespuestasSolicitante())
                 .respuestasPorDepartamento(s.getRespuestasPorDepartamento())
                 .adjuntos(s.getAdjuntos())
+                .fechaLimite(s.getFechaLimite())
+                .estadoSla(s.getEstadoSla())
                 .build();
     }
 
@@ -40,6 +42,8 @@ public class SolicitudTramiteMapper {
                 .departamentosActuales(s.getDepartamentosActuales())
                 .fechaCreacion(s.getFechaCreacion())
                 .fechaFinalizacion(s.getFechaFinalizacion())
+                .fechaLimite(s.getFechaLimite())
+                .estadoSla(s.getEstadoSla())
                 .build();
     }
 

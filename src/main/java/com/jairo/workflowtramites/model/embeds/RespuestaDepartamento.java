@@ -1,5 +1,6 @@
 package com.jairo.workflowtramites.model.embeds;
 
+import com.jairo.workflowtramites.model.enums.EstadoSla;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,4 +29,8 @@ public class RespuestaDepartamento {
     private LocalDateTime fechaEntrada;
     private LocalDateTime fechaRespuesta;
     private List<RespuestaCampo> respuestas;
+
+    // SLA del nodo a nivel de instancia (calculado al entrar al nodo, actualizado por SlaMonitorJob)
+    private LocalDateTime fechaLimiteNodo;
+    private EstadoSla estadoSlaNodo;
 }

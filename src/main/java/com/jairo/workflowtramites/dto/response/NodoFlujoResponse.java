@@ -21,4 +21,7 @@ public class NodoFlujoResponse {
     private List<CampoFormulario> camposFormulario;
     private List<TransicionResponse> transiciones;
     private ConfiguracionDocumental configuracionDocumental;
+
+    // SLA del nodo (OLA interno)
+    private Integer slaNodoHoras;
 }

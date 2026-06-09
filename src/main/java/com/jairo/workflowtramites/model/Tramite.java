@@ -1,5 +1,6 @@
 package com.jairo.workflowtramites.model;
 
+import com.jairo.workflowtramites.model.enums.CategoriaCriticidad;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,4 +32,10 @@ public class Tramite extends AuditableDocument {
     private List<String> etiquetas = new ArrayList<>();
 
     private boolean activo;
+
+    // SLA del trámite (compromiso con el solicitante - patrón ITIL)
+    private Integer plazoObjetivoHoras;
+    private Integer plazoMaximoHoras;
+    private Integer umbralAlertaPorcentaje;
+    private CategoriaCriticidad criticidad;
 }

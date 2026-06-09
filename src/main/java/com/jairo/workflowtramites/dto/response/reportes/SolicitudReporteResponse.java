@@ -17,7 +17,8 @@ public class SolicitudReporteResponse {
     private String solicitanteId;
     private String solicitanteNombre;
     private EstadoTramite estado;
-    private List<String> departamentosActuales;
+    // Antes era List<String> de IDs crudos; ahora {id, nombre} para que el reporte sea legible.
+    private List<DepartamentoResumenResponse> departamentosActuales;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaFinalizacion;
     private Double horasTranscurridas;

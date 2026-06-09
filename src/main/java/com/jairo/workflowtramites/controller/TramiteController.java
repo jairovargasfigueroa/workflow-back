@@ -1,9 +1,11 @@
 package com.jairo.workflowtramites.controller;
 
 import com.jairo.workflowtramites.dto.request.TramiteRequest;
+import com.jairo.workflowtramites.dto.response.DocumentoProducidoSlotResponse;
 import com.jairo.workflowtramites.dto.response.FormularioTemplateResponse;
 import com.jairo.workflowtramites.dto.response.TramiteDisponibleResponse;
 import com.jairo.workflowtramites.dto.response.TramiteResponse;
+import com.jairo.workflowtramites.service.SolicitudTramiteService;
 import com.jairo.workflowtramites.service.TramiteService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import java.util.List;
 public class TramiteController {
 
     private final TramiteService tramiteService;
+    private final SolicitudTramiteService solicitudTramiteService;
 
     @GetMapping
     public ResponseEntity<List<TramiteResponse>> listar() {
@@ -55,5 +58,14 @@ public class TramiteController {
     @GetMapping("/{id}/formulario-solicitante")
     public ResponseEntity<FormularioTemplateResponse> obtenerFormularioSolicitante(@PathVariable String id) {
         return ResponseEntity.ok(tramiteService.obtenerFormularioSolicitante(id));
+    }
+
+    /**
+     * Documentos que el solicitante debe subir al iniciar el tramite (el "kit").
+     * Salen del nodo inicial del flujo activo. El front los muestra como slots al crear la solicitud.
+     */
+    @GetMapping("/{id}/documentos-kit")
+    public ResponseEntity<List<DocumentoProducidoSlotResponse>> obtenerDocumentosKit(@PathVariable String id) {
+        return ResponseEntity.ok(solicitudTramiteService.obtenerDocumentosKit(id));
     }
 }

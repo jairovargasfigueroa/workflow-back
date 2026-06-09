@@ -7,7 +7,7 @@ public interface StorageService {
 
     void subir(String key, InputStream contenido, long tamanoBytes, String contentType);
 
-    String generarUrlPrefirmadaDescarga(String key, Duration duracion);
+    String generarUrlPrefirmadaDescarga(String key, Duration duracion, String contentDisposition);
 
     InputStream descargar(String key);
 

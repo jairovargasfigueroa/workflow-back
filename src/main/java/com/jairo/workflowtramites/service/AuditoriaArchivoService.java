@@ -40,6 +40,25 @@ public class AuditoriaArchivoService {
         repository.save(evento);
     }
 
+    /**
+     * Registra un evento con un usuario EXPLÍCITO (no tomado del contexto de seguridad).
+     * Necesario para el callback de OnlyOffice: lo invoca OnlyOffice sin el JWT del usuario,
+     * así que el editor viene en el payload, no en el SecurityContext.
+     */
+    public void registrarConUsuario(TipoEventoArchivo tipo, String archivoId, String solicitudId,
+                                    String detalle, String usuarioId, String usuarioNombre) {
+        EventoAuditoriaArchivo evento = EventoAuditoriaArchivo.builder()
+                .archivoId(archivoId)
+                .solicitudId(solicitudId)
+                .tipo(tipo)
+                .fecha(LocalDateTime.now())
+                .detalle(detalle)
+                .usuarioId(usuarioId)
+                .usuarioNombre(usuarioNombre)
+                .build();
+        repository.save(evento);
+    }
+
     public void registrarDenegado(TipoEventoArchivo tipoIntentado, String archivoId, String motivo) {
         EventoAuditoriaArchivo evento = EventoAuditoriaArchivo.builder()
                 .archivoId(archivoId)

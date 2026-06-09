@@ -14,12 +14,12 @@ import java.util.List;
 @AllArgsConstructor
 public class ConfiguracionDocumental {
 
-    @Builder.Default
-    private List<DocumentoConfig> documentosEsperados = new ArrayList<>();
-
+    // Documentos que el funcionario genera en el nodo (con permisos por documento).
     @Builder.Default
     private List<DocumentoConfig> documentosProducidos = new ArrayList<>();
 
+    // Permisos por defecto para archivos sueltos (ad-hoc) subidos en el nodo
+    // sin asociarlos a un documento declarado.
     @Builder.Default
     private PermisoSet permisosDefaultAdHoc = PermisoSet.builder().build();
 }

@@ -1,5 +1,6 @@
 package com.jairo.workflowtramites.dto.response;
 
+import com.jairo.workflowtramites.model.enums.CategoriaCriticidad;
 import lombok.Builder;
 import lombok.Data;
 
@@ -19,4 +20,10 @@ public class TramiteResponse {
     private List<String> etiquetas;
     private boolean activo;
     private LocalDateTime fechaCreacion;
+
+    // SLA del trámite
+    private Integer plazoObjetivoHoras;
+    private Integer plazoMaximoHoras;
+    private Integer umbralAlertaPorcentaje;
+    private CategoriaCriticidad criticidad;
 }

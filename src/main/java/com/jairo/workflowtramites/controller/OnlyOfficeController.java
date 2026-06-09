@@ -27,8 +27,9 @@ public class OnlyOfficeController {
     private final OnlyOfficeService onlyOfficeService;
 
     @GetMapping("/abrir/{archivoId}")
-    public OnlyOfficeEditorConfigResponse abrir(@PathVariable String archivoId) {
-        return onlyOfficeService.abrirEditor(archivoId);
+    public OnlyOfficeEditorConfigResponse abrir(@PathVariable String archivoId,
+                                                @RequestParam(defaultValue = "false") boolean soloVista) {
+        return onlyOfficeService.abrirEditor(archivoId, soloVista);
     }
 
     @GetMapping("/contenido/{archivoId}")

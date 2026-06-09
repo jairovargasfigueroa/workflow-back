@@ -23,4 +23,7 @@ public class NodoFlujo {
     private List<CampoFormulario> camposFormulario;
     private List<TransicionFlujo> transiciones;
     private ConfiguracionDocumental configuracionDocumental;
+
+    // SLA del nodo (OLA interno - patrón ITIL). Parseado del XML BPMN como camunda:property.
+    private Integer slaNodoHoras;
 }

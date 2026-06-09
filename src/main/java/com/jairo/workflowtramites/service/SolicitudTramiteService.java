@@ -3,6 +3,7 @@ package com.jairo.workflowtramites.service;
 import com.jairo.workflowtramites.dto.request.RespuestaDepartamentoRequest;
 import com.jairo.workflowtramites.dto.request.SolicitudTramiteRequest;
 import com.jairo.workflowtramites.dto.response.AccionDisponibleResponse;
+import com.jairo.workflowtramites.dto.response.DocumentoProducidoSlotResponse;
 import com.jairo.workflowtramites.dto.response.NodoFlujoResponse;
 import com.jairo.workflowtramites.dto.response.SolicitudTramiteResumen;
 import com.jairo.workflowtramites.dto.response.SolicitudTramiteResponse;
@@ -14,6 +15,7 @@ import com.jairo.workflowtramites.model.SolicitudTramite;
 import com.jairo.workflowtramites.model.Tramite;
 import com.jairo.workflowtramites.model.embeds.RespuestaDepartamento;
 import com.jairo.workflowtramites.model.enums.EstadoFlujo;
+import com.jairo.workflowtramites.model.enums.EstadoSla;
 import com.jairo.workflowtramites.model.enums.EstadoTramite;
 import com.jairo.workflowtramites.repository.SolicitudTramiteRepository;
 import com.jairo.workflowtramites.service.notification.NotificationPayload;
@@ -124,6 +126,13 @@ public class SolicitudTramiteService {
         solicitud.setTramiteNombre(tramite.getNombre());
         solicitud.setSolicitanteNombre(usuarioService.obtenerPorId(solicitanteId).getNombre());
 
+        // SLA del trámite: calcular fechaLimite si el trámite tiene plazoObjetivoHoras configurado
+        LocalDateTime fechaCreacion = LocalDateTime.now();
+        if (tramite.getPlazoObjetivoHoras() != null && tramite.getPlazoObjetivoHoras() > 0) {
+            solicitud.setFechaLimite(fechaCreacion.plusHours(tramite.getPlazoObjetivoHoras()));
+            solicitud.setEstadoSla(EstadoSla.VERDE);
+        }
+
         SolicitudTramite guardada = solicitudTramiteRepository.save(solicitud);
 
         if (tramite.getFlujoTrabajoId() != null) {
@@ -144,17 +153,25 @@ public class SolicitudTramiteService {
             guardada.setDepartamentosActuales(resultado.getTareasActuales().stream()
                     .map(t -> t.getDepartamentoId()).toList());
 
-            Map<String, String> formulariosPorElementId = obtenerFormulariosPorElementId(flujo.getVersionActualId());
+            Map<String, InfoNodo> infoNodosPorElementId = obtenerInfoNodosPorElementId(flujo.getVersionActualId());
+            LocalDateTime fechaEntradaInicial = LocalDateTime.now();
 
             for (var tarea : resultado.getTareasActuales()) {
-                guardada.getRespuestasPorDepartamento().add(
-                        RespuestaDepartamento.builder()
-                                .departamentoId(tarea.getDepartamentoId())
-                                .departamentoNombre(departamentoService.obtenerPorId(tarea.getDepartamentoId()).getNombre())
-                                .elementId(tarea.getElementId())
-                                .formularioId(formulariosPorElementId.get(tarea.getElementId()))
-                                .fechaEntrada(LocalDateTime.now())
-                                .build());
+                InfoNodo infoNodo = infoNodosPorElementId.get(tarea.getElementId());
+                RespuestaDepartamento.RespuestaDepartamentoBuilder builder = RespuestaDepartamento.builder()
+                        .departamentoId(tarea.getDepartamentoId())
+                        .departamentoNombre(departamentoService.obtenerPorId(tarea.getDepartamentoId()).getNombre())
+                        .elementId(tarea.getElementId())
+                        .formularioId(infoNodo != null ? infoNodo.formularioId : null)
+                        .fechaEntrada(fechaEntradaInicial);
+
+                // SLA del nodo: calcular fechaLimiteNodo si el nodo tiene slaNodoHoras configurado
+                if (infoNodo != null && infoNodo.slaNodoHoras != null && infoNodo.slaNodoHoras > 0) {
+                    builder.fechaLimiteNodo(fechaEntradaInicial.plusHours(infoNodo.slaNodoHoras));
+                    builder.estadoSlaNodo(EstadoSla.VERDE);
+                }
+
+                guardada.getRespuestasPorDepartamento().add(builder.build());
             }
 
             guardada = solicitudTramiteRepository.save(guardada);
@@ -171,6 +188,42 @@ public class SolicitudTramiteService {
                 .build());
 
         return SolicitudTramiteMapper.toResponse(guardada);
+    }
+
+    /**
+     * Documentos que el solicitante debe subir al iniciar el tramite (el "kit").
+     * Salen del nodo inicial (startEvent) de la version activa del flujo del tramite.
+     * El front los muestra como slots de subida al crear la solicitud.
+     */
+    public List<DocumentoProducidoSlotResponse> obtenerDocumentosKit(String tramiteId) {
+        Tramite tramite = tramiteService.obtenerEntidad(tramiteId);
+        if (tramite.getFlujoTrabajoId() == null) return List.of();
+
+        FlujoTrabajo flujo = flujoTrabajoService.obtenerEntidad(tramite.getFlujoTrabajoId());
+        if (flujo.getVersionActualId() == null) return List.of();
+
+        var versionOpt = versionFlujoRepository.findById(flujo.getVersionActualId());
+        if (versionOpt.isEmpty() || versionOpt.get().getNodos() == null) return List.of();
+
+        var nodoInicial = versionOpt.get().getNodos().stream()
+                .filter(n -> "startEvent".equals(n.getTipo()))
+                .findFirst()
+                .orElse(null);
+
+        if (nodoInicial == null
+                || nodoInicial.getConfiguracionDocumental() == null
+                || nodoInicial.getConfiguracionDocumental().getDocumentosProducidos() == null) {
+            return List.of();
+        }
+
+        return nodoInicial.getConfiguracionDocumental().getDocumentosProducidos().stream()
+                .map(d -> DocumentoProducidoSlotResponse.builder()
+                        .nombre(d.getNombre())
+                        .formatosAceptados(d.getFormatosAceptados())
+                        .obligatorio(d.isObligatorio())
+                        .inmutablePostCierre(d.isInmutablePostCierre())
+                        .build())
+                .toList();
     }
 
     public SolicitudTramiteResponse actualizar(String id, SolicitudTramiteRequest request) {
@@ -239,17 +292,24 @@ public class SolicitudTramiteService {
                         .map(TareaActiva::getDepartamentoId).toList());
                 solicitud.setEstado(EstadoTramite.EN_PROCESO);
 
-                Map<String, String> formulariosPorElementId = obtenerFormulariosPorElementId(solicitud.getVersionFlujoId());
+                Map<String, InfoNodo> infoNodosPorElementId = obtenerInfoNodosPorElementId(solicitud.getVersionFlujoId());
 
                 for (TareaActiva tarea : nuevas) {
-                    solicitud.getRespuestasPorDepartamento().add(
-                            RespuestaDepartamento.builder()
-                                    .departamentoId(tarea.getDepartamentoId())
-                                    .departamentoNombre(departamentoService.obtenerPorId(tarea.getDepartamentoId()).getNombre())
-                                    .elementId(tarea.getElementId())
-                                    .formularioId(formulariosPorElementId.get(tarea.getElementId()))
-                                    .fechaEntrada(ahora)
-                                    .build());
+                    InfoNodo infoNodo = infoNodosPorElementId.get(tarea.getElementId());
+                    RespuestaDepartamento.RespuestaDepartamentoBuilder builder = RespuestaDepartamento.builder()
+                            .departamentoId(tarea.getDepartamentoId())
+                            .departamentoNombre(departamentoService.obtenerPorId(tarea.getDepartamentoId()).getNombre())
+                            .elementId(tarea.getElementId())
+                            .formularioId(infoNodo != null ? infoNodo.formularioId : null)
+                            .fechaEntrada(ahora);
+
+                    // SLA del nodo: calcular fechaLimiteNodo si el nodo tiene slaNodoHoras configurado
+                    if (infoNodo != null && infoNodo.slaNodoHoras != null && infoNodo.slaNodoHoras > 0) {
+                        builder.fechaLimiteNodo(ahora.plusHours(infoNodo.slaNodoHoras));
+                        builder.estadoSlaNodo(EstadoSla.VERDE);
+                    }
+
+                    solicitud.getRespuestasPorDepartamento().add(builder.build());
                 }
             }
         }
@@ -368,8 +428,24 @@ public class SolicitudTramiteService {
                     .carrilNombre(nodo.getCarrilNombre())
                     .campos(campos)
                     .acciones(resolverAcciones(nodo, version))
+                    .documentosProducidos(resolverDocumentosProducidos(nodo))
                     .build();
         }).toList();
+    }
+
+    private List<DocumentoProducidoSlotResponse> resolverDocumentosProducidos(NodoFlujoResponse nodo) {
+        if (nodo.getConfiguracionDocumental() == null
+                || nodo.getConfiguracionDocumental().getDocumentosProducidos() == null) {
+            return List.of();
+        }
+        return nodo.getConfiguracionDocumental().getDocumentosProducidos().stream()
+                .map(d -> DocumentoProducidoSlotResponse.builder()
+                        .nombre(d.getNombre())
+                        .formatosAceptados(d.getFormatosAceptados())
+                        .obligatorio(d.isObligatorio())
+                        .inmutablePostCierre(d.isInmutablePostCierre())
+                        .build())
+                .toList();
     }
 
     private List<AccionDisponibleResponse> resolverAcciones(NodoFlujoResponse nodo, VersionFlujoResponse version) {
@@ -412,11 +488,13 @@ public class SolicitudTramiteService {
         List<String> faltantes = new ArrayList<>();
         for (var docConfig : documentosProducidos) {
             if (!docConfig.isObligatorio()) continue;
-            String campo = docConfig.getCampoFormularioAsociado();
-            if (campo == null) continue;
+            // El documento producido se identifica por su nombre (el archivo se sube
+            // con campoFormularioOrigen = nombre del documento producido).
+            String identificador = docConfig.getNombre();
+            if (identificador == null) continue;
 
             boolean existe = !archivoRepository.findBySolicitudIdAndCampoFormularioOrigenAndEstado(
-                    solicitud.getId(), campo, com.jairo.workflowtramites.model.Archivo.EstadoArchivo.ACTIVO
+                    solicitud.getId(), identificador, com.jairo.workflowtramites.model.Archivo.EstadoArchivo.ACTIVO
             ).isEmpty();
 
             if (!existe) {
@@ -430,11 +508,12 @@ public class SolicitudTramiteService {
 
         for (var docConfig : documentosProducidos) {
             if (!docConfig.isInmutablePostCierre()) continue;
-            String campo = docConfig.getCampoFormularioAsociado();
-            if (campo == null) continue;
+            // Identificado por nombre (mismo criterio que la subida).
+            String identificador = docConfig.getNombre();
+            if (identificador == null) continue;
 
             archivoRepository.findBySolicitudIdAndCampoFormularioOrigenAndEstado(
-                    solicitud.getId(), campo, com.jairo.workflowtramites.model.Archivo.EstadoArchivo.ACTIVO
+                    solicitud.getId(), identificador, com.jairo.workflowtramites.model.Archivo.EstadoArchivo.ACTIVO
             ).forEach(a -> {
                 a.setInmutable(true);
                 archivoRepository.save(a);
@@ -442,12 +521,21 @@ public class SolicitudTramiteService {
         }
     }
 
-    private Map<String, String> obtenerFormulariosPorElementId(String versionId) {
+    private Map<String, InfoNodo> obtenerInfoNodosPorElementId(String versionId) {
         return flujoTrabajoService.obtenerVersionPorId(versionId)
                 .getNodos().stream()
-                .filter(n -> n.getElementId() != null && n.getFormularioId() != null)
-                .collect(Collectors.toMap(NodoFlujoResponse::getElementId, NodoFlujoResponse::getFormularioId, (a, b) -> a));
+                .filter(n -> n.getElementId() != null)
+                .collect(Collectors.toMap(
+                        NodoFlujoResponse::getElementId,
+                        n -> new InfoNodo(n.getFormularioId(), n.getSlaNodoHoras()),
+                        (a, b) -> a));
     }
+
+    /**
+     * Información del nodo necesaria al crear RespuestaDepartamento.
+     * Centraliza la lectura de VersionFlujo para no hacer N+1.
+     */
+    private record InfoNodo(String formularioId, Integer slaNodoHoras) {}
 
     private EstadoTramite mapearEstadoFinal(String nombreEndEvent) {
         if (nombreEndEvent == null) throw new RuntimeException("El proceso terminó sin un end event nombrado");

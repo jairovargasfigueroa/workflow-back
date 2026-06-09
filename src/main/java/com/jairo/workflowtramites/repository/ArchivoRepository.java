@@ -9,6 +9,8 @@ public interface ArchivoRepository extends MongoRepository<Archivo, String> {
 
     List<Archivo> findBySolicitudIdAndEstadoNot(String solicitudId, Archivo.EstadoArchivo estado);
 
+    List<Archivo> findByEstado(Archivo.EstadoArchivo estado);
+
     List<Archivo> findByClienteIdAndEstadoNot(String clienteId, Archivo.EstadoArchivo estado);
 
     List<Archivo> findByPoliticaIdAndEstadoNot(String politicaId, Archivo.EstadoArchivo estado);

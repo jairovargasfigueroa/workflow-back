@@ -22,11 +22,15 @@ public class PermisoArchivoService {
 
     public boolean puede(AuthenticatedUser usuario, AccionArchivo accion, Archivo archivo) {
         if (usuario == null) return false;
-        if (usuario.getRol() == Rol.ADMIN) return true;
 
+        // La inmutabilidad aplica a TODOS, incluido el ADMIN: un documento cerrado
+        // ("el contrato que nadie puede tocar") solo se puede ver/descargar, nunca
+        // modificar ni eliminar. Por eso este chequeo va ANTES del bypass de admin.
         if (archivo.isInmutable() && accion != AccionArchivo.VER && accion != AccionArchivo.DESCARGAR) {
             return false;
         }
+
+        if (usuario.getRol() == Rol.ADMIN) return true;
 
         if (usuario.getId() != null && usuario.getId().equals(archivo.getSubidoPor())) {
             if (accion == AccionArchivo.VER || accion == AccionArchivo.DESCARGAR) {

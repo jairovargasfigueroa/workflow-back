@@ -2,6 +2,7 @@ package com.jairo.workflowtramites.mapper;
 
 import com.jairo.workflowtramites.dto.response.reportes.DemoraResponse;
 import com.jairo.workflowtramites.dto.response.reportes.DepartamentoReporteResponse;
+import com.jairo.workflowtramites.dto.response.reportes.DepartamentoResumenResponse;
 import com.jairo.workflowtramites.dto.response.reportes.SolicitudReporteResponse;
 import com.jairo.workflowtramites.dto.response.reportes.TramiteReporteResponse;
 import com.jairo.workflowtramites.dto.response.reportes.UsuarioReporteResponse;
@@ -12,6 +13,8 @@ import com.jairo.workflowtramites.model.Usuario;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 public class ReportesMapper {
 
@@ -48,12 +51,25 @@ public class ReportesMapper {
                 .build();
     }
 
-    public static SolicitudReporteResponse toSolicitudReporteResponse(SolicitudTramite s) {
+    public static SolicitudReporteResponse toSolicitudReporteResponse(
+            SolicitudTramite s, Map<String, String> nombresDeptos) {
         Double horas = null;
         if (s.getFechaCreacion() != null) {
             LocalDateTime fin = s.getFechaFinalizacion() != null ? s.getFechaFinalizacion() : LocalDateTime.now();
             horas = Duration.between(s.getFechaCreacion(), fin).toMinutes() / 60.0;
         }
+
+        // Resuelve los IDs de departamentosActuales a {id, nombre} usando el catalogo.
+        // Si no se encuentra el nombre, cae al id (no rompe, queda visible que falta).
+        List<DepartamentoResumenResponse> deptos = s.getDepartamentosActuales() == null
+                ? List.of()
+                : s.getDepartamentosActuales().stream()
+                        .map(id -> DepartamentoResumenResponse.builder()
+                                .id(id)
+                                .nombre(nombresDeptos.getOrDefault(id, id))
+                                .build())
+                        .toList();
+
         return SolicitudReporteResponse.builder()
                 .id(s.getId())
                 .tramiteId(s.getTramiteId())
@@ -61,7 +77,7 @@ public class ReportesMapper {
                 .solicitanteId(s.getSolicitanteId())
                 .solicitanteNombre(s.getSolicitanteNombre())
                 .estado(s.getEstado())
-                .departamentosActuales(s.getDepartamentosActuales())
+                .departamentosActuales(deptos)
                 .fechaCreacion(s.getFechaCreacion())
                 .fechaFinalizacion(s.getFechaFinalizacion())
                 .horasTranscurridas(horas)

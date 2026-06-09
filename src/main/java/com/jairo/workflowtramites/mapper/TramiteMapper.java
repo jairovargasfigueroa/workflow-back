@@ -19,6 +19,10 @@ public class TramiteMapper {
                 .etiquetas(t.getEtiquetas())
                 .activo(t.isActivo())
                 .fechaCreacion(t.getFechaCreacion())
+                .plazoObjetivoHoras(t.getPlazoObjetivoHoras())
+                .plazoMaximoHoras(t.getPlazoMaximoHoras())
+                .umbralAlertaPorcentaje(t.getUmbralAlertaPorcentaje())
+                .criticidad(t.getCriticidad())
                 .build();
     }
 
@@ -31,6 +35,10 @@ public class TramiteMapper {
                 .requisitos(r.getRequisitos() != null ? r.getRequisitos() : new ArrayList<>())
                 .etiquetas(r.getEtiquetas() != null ? r.getEtiquetas() : new ArrayList<>())
                 .activo(true)
+                .plazoObjetivoHoras(r.getPlazoObjetivoHoras())
+                .plazoMaximoHoras(r.getPlazoMaximoHoras())
+                .umbralAlertaPorcentaje(r.getUmbralAlertaPorcentaje())
+                .criticidad(r.getCriticidad())
                 .build();
     }
 }

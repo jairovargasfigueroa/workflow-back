@@ -60,6 +60,7 @@ public class VersionFlujoMapper {
                 .camposFormulario(n.getCamposFormulario())
                 .transiciones(toTransicionesResponse(n.getTransiciones()))
                 .configuracionDocumental(n.getConfiguracionDocumental())
+                .slaNodoHoras(n.getSlaNodoHoras())
                 .build();
     }
 

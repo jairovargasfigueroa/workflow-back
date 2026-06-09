@@ -1,5 +1,6 @@
 package com.jairo.workflowtramites.dto.request;
 
+import com.jairo.workflowtramites.model.enums.CategoriaCriticidad;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -24,4 +25,10 @@ public class TramiteRequest {
     private List<String> requisitos;
 
     private List<String> etiquetas;
+
+    // SLA del trámite (opcionales)
+    private Integer plazoObjetivoHoras;
+    private Integer plazoMaximoHoras;
+    private Integer umbralAlertaPorcentaje;
+    private CategoriaCriticidad criticidad;
 }

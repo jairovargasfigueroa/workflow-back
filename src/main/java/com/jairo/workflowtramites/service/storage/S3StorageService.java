@@ -39,10 +39,11 @@ public class S3StorageService implements StorageService {
     }
 
     @Override
-    public String generarUrlPrefirmadaDescarga(String key, Duration duracion) {
+    public String generarUrlPrefirmadaDescarga(String key, Duration duracion, String contentDisposition) {
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
+                .responseContentDisposition(contentDisposition)
                 .build();
 
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()

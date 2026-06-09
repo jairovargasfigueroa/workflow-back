@@ -3,6 +3,7 @@ package com.jairo.workflowtramites.model;
 import com.jairo.workflowtramites.model.embeds.Adjunto;
 import com.jairo.workflowtramites.model.embeds.RespuestaCampo;
 import com.jairo.workflowtramites.model.embeds.RespuestaDepartamento;
+import com.jairo.workflowtramites.model.enums.EstadoSla;
 import com.jairo.workflowtramites.model.enums.EstadoTramite;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -54,4 +55,8 @@ public class SolicitudTramite extends AuditableDocument {
 
     @Builder.Default
     private List<Adjunto> adjuntos = new ArrayList<>();
+
+    // SLA del trámite a nivel de solicitud (calculado al crear, actualizado por SlaMonitorJob)
+    private LocalDateTime fechaLimite;
+    private EstadoSla estadoSla;
 }

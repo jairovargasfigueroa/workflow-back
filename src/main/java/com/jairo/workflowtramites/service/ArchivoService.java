@@ -1,6 +1,7 @@
 package com.jairo.workflowtramites.service;
 
 import com.jairo.workflowtramites.dto.response.ArchivoDescargaResponse;
+import com.jairo.workflowtramites.dto.response.reportes.PaginaResponse;
 import com.jairo.workflowtramites.exception.RecursoNoEncontradoException;
 import com.jairo.workflowtramites.model.Archivo;
 import com.jairo.workflowtramites.model.SolicitudTramite;
@@ -24,8 +25,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -44,8 +48,13 @@ public class ArchivoService {
     @Value("${aws.s3.presigned-url-expiration-minutes}")
     private int presignedUrlExpirationMinutes;
 
-    private static final Set<String> FORMATOS_PERMITIDOS = Set.of(
-            "pdf", "docx", "xlsx", "doc", "xls", "jpg", "jpeg", "png"
+    // El docente pidió soportar "cualquier formato" (Word, Excel, PDF, imágenes, video, etc.).
+    // En lugar de una lista blanca restrictiva, bloqueamos solo ejecutables/scripts por seguridad
+    // (los archivos van a S3, no se ejecutan en el servidor, pero evitamos distribuir binarios
+    // peligrosos desde el repositorio documental). Todo lo demás se acepta.
+    private static final Set<String> FORMATOS_BLOQUEADOS = Set.of(
+            "exe", "bat", "cmd", "com", "scr", "msi", "sh", "bash",
+            "ps1", "vbs", "jar", "dll", "app", "deb", "dmg"
     );
 
     public Archivo subir(MultipartFile archivo,
@@ -116,30 +125,26 @@ public class ArchivoService {
             for (NodoFlujo n : nodos) {
                 if (n.getConfiguracionDocumental() == null) continue;
                 if (matchPorCampo(n.getConfiguracionDocumental().getDocumentosProducidos(), campoFormulario)) return n;
-                if (matchPorCampo(n.getConfiguracionDocumental().getDocumentosEsperados(), campoFormulario)) return n;
             }
         }
 
         return null;
     }
 
-    private boolean matchPorCampo(List<DocumentoConfig> docs, String campo) {
+    private boolean matchPorCampo(List<DocumentoConfig> docs, String identificador) {
         if (docs == null) return false;
-        return docs.stream().anyMatch(d -> campo.equals(d.getCampoFormularioAsociado()));
+        // El documento producido se identifica por su nombre (el front lo manda como campoFormulario).
+        return docs.stream().anyMatch(d -> identificador.equals(d.getNombre()));
     }
 
     private DocumentoConfig encontrarDocumentoConfig(NodoFlujo nodo, String campoFormulario) {
         if (nodo == null || nodo.getConfiguracionDocumental() == null) return null;
         if (campoFormulario == null) return null;
         ConfiguracionDocumental config = nodo.getConfiguracionDocumental();
+        if (config.getDocumentosProducidos() == null) return null;
 
-        Optional<DocumentoConfig> producido = config.getDocumentosProducidos().stream()
-                .filter(d -> campoFormulario.equals(d.getCampoFormularioAsociado()))
-                .findFirst();
-        if (producido.isPresent()) return producido.get();
-
-        return config.getDocumentosEsperados().stream()
-                .filter(d -> campoFormulario.equals(d.getCampoFormularioAsociado()))
+        return config.getDocumentosProducidos().stream()
+                .filter(d -> campoFormulario.equals(d.getNombre()))
                 .findFirst()
                 .orElse(null);
     }
@@ -163,6 +168,52 @@ public class ArchivoService {
                 .toList();
     }
 
+    /**
+     * Repositorio documental global (vista del admin para "hacer consultas").
+     * Lista la metadata desde MongoDB (NO recorre S3) de los archivos ACTIVOS,
+     * aplicando filtros opcionales + permisos del usuario, ordenados por fecha desc
+     * y paginados. S3 solo se toca al descargar.
+     */
+    public PaginaResponse<Archivo> listarRepositorio(
+            String tramiteId, String clienteId, String formato,
+            LocalDateTime fechaDesde, LocalDateTime fechaHasta,
+            int page, int size) {
+
+        AuthenticatedUser usuario = usuarioActual();
+        int tamano = Math.min(Math.max(size, 1), 200);
+        int pagina = Math.max(page, 0);
+
+        List<Archivo> filtrados = archivoRepository.findByEstado(Archivo.EstadoArchivo.ACTIVO)
+                .stream()
+                .filter(a -> tramiteId == null || tramiteId.equals(a.getPoliticaId()))
+                .filter(a -> clienteId == null || clienteId.equals(a.getClienteId()))
+                .filter(a -> formato == null || formato.equalsIgnoreCase(a.getFormato()))
+                .filter(a -> fechaDesde == null
+                        || (a.getFechaSubida() != null && !a.getFechaSubida().isBefore(fechaDesde)))
+                .filter(a -> fechaHasta == null
+                        || (a.getFechaSubida() != null && !a.getFechaSubida().isAfter(fechaHasta)))
+                .filter(a -> permisoArchivoService.puede(usuario, AccionArchivo.VER, a))
+                .sorted(Comparator.comparing(Archivo::getFechaSubida,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+
+        long total = filtrados.size();
+        int totalPaginas = (int) Math.ceil((double) total / tamano);
+
+        List<Archivo> contenido = filtrados.stream()
+                .skip((long) pagina * tamano)
+                .limit(tamano)
+                .toList();
+
+        return PaginaResponse.<Archivo>builder()
+                .contenido(contenido)
+                .pagina(pagina)
+                .tamano(tamano)
+                .total(total)
+                .totalPaginas(totalPaginas)
+                .build();
+    }
+
     public Archivo obtenerPorId(String archivoId) {
         return archivoRepository.findById(archivoId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Archivo no encontrado: " + archivoId));
@@ -176,7 +227,7 @@ public class ArchivoService {
         return archivo;
     }
 
-    public ArchivoDescargaResponse generarUrlDescarga(String archivoId) {
+    public ArchivoDescargaResponse generarUrlDescarga(String archivoId, boolean attachment) {
         Archivo archivo = obtenerPorId(archivoId);
 
         if (archivo.getEstado() == Archivo.EstadoArchivo.ELIMINADO) {
@@ -188,7 +239,11 @@ public class ArchivoService {
         }
 
         Duration duracion = Duration.ofMinutes(presignedUrlExpirationMinutes);
-        String url = storageService.generarUrlPrefirmadaDescarga(archivo.getS3Key(), duracion);
+        // attachment=true -> el navegador BAJA el archivo; false -> lo MUESTRA inline (imagen/video/pdf).
+        String tipo = attachment ? "attachment" : "inline";
+        String nombreCodificado = URLEncoder.encode(archivo.getNombre(), StandardCharsets.UTF_8).replace("+", "%20");
+        String contentDisposition = tipo + "; filename*=UTF-8''" + nombreCodificado;
+        String url = storageService.generarUrlPrefirmadaDescarga(archivo.getS3Key(), duracion, contentDisposition);
 
         return ArchivoDescargaResponse.builder()
                 .archivoId(archivo.getId())
@@ -343,8 +398,10 @@ public class ArchivoService {
             throw new AccessDeniedException("No tienes permiso para eliminar este archivo");
         }
 
-        storageService.eliminar(archivo.getS3Key());
-
+        // SOFT DELETE: NO borramos de S3. En un sistema de gestion documental el documento se
+        // preserva (trazabilidad/auditoria: "registro completo", "el contrato nadie lo toca").
+        // Solo se marca ELIMINADO: deja de aparecer en los listados (que filtran por estado) y
+        // no se puede descargar ni versionar. El archivo fisico queda en S3 por si hay que auditar.
         archivo.setEstado(Archivo.EstadoArchivo.ELIMINADO);
         archivo.setEliminadoPor(usuario.getId());
         archivo.setFechaEliminacion(LocalDateTime.now());
@@ -360,8 +417,8 @@ public class ArchivoService {
             throw new RuntimeException("El nombre del archivo es inválido");
         }
         String formato = extraerExtension(nombre);
-        if (!FORMATOS_PERMITIDOS.contains(formato)) {
-            throw new RuntimeException("Formato no permitido: " + formato + ". Permitidos: " + FORMATOS_PERMITIDOS);
+        if (FORMATOS_BLOQUEADOS.contains(formato)) {
+            throw new RuntimeException("Formato no permitido por seguridad: " + formato);
         }
     }
 

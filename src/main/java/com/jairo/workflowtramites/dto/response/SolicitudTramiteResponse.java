@@ -3,6 +3,7 @@ package com.jairo.workflowtramites.dto.response;
 import com.jairo.workflowtramites.model.embeds.Adjunto;
 import com.jairo.workflowtramites.model.embeds.RespuestaCampo;
 import com.jairo.workflowtramites.model.embeds.RespuestaDepartamento;
+import com.jairo.workflowtramites.model.enums.EstadoSla;
 import com.jairo.workflowtramites.model.enums.EstadoTramite;
 import lombok.Builder;
 import lombok.Data;
@@ -27,4 +28,8 @@ public class SolicitudTramiteResponse {
     private List<RespuestaCampo> respuestasSolicitante;
     private List<RespuestaDepartamento> respuestasPorDepartamento;
     private List<Adjunto> adjuntos;
+
+    // SLA del trámite a nivel de solicitud
+    private LocalDateTime fechaLimite;
+    private EstadoSla estadoSla;
 }
