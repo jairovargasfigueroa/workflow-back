@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jairo.workflowtramites.model.embeds.ConfiguracionDocumental;
 import com.jairo.workflowtramites.model.embeds.NodoFlujo;
 import com.jairo.workflowtramites.model.embeds.TransicionFlujo;
+import com.jairo.workflowtramites.model.enums.AccionFlujo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
@@ -254,6 +255,31 @@ public class BpmnParserService {
                     errores.add("La compuerta paralela '" + etiqueta + "' necesita al menos 2 entradas (join) o 2 salidas (fork)");
             }
 
+            // Catalogo de acciones: las salidas de un punto de decision deben usar una accion conocida.
+            for (int g = 0; g < gateways.getLength(); g++) {
+                Element gw = (Element) gateways.item(g);
+                String etiquetaGw = label(gw);
+                for (TransicionFlujo t : transicionesPorOrigen.getOrDefault(gw.getAttribute("id"), List.of())) {
+                    if (t.getValor() != null && !AccionFlujo.valoresValidos().contains(t.getValor())) {
+                        errores.add("La salida '" + (t.getEtiqueta() != null ? t.getEtiqueta() : t.getValor())
+                                + "' del punto de decision '" + etiquetaGw
+                                + "' no es una accion valida (use: Aprobado, Rechazado, Observado, Corregido, Cancelado)");
+                    }
+                }
+            }
+
+            // Los eventos de fin deben nombrarse con un estado final del catalogo (define el estado del tramite).
+            NodeList endEvents = doc.getElementsByTagNameNS("*", "endEvent");
+            for (int k = 0; k < endEvents.getLength(); k++) {
+                Element endEvent = (Element) endEvents.item(k);
+                String nombreEnd = endEvent.getAttribute("name");
+                String valorEnd = normalizarValor(nombreEnd, endEvent.getAttribute("id"));
+                if (nombreEnd.isBlank() || !AccionFlujo.valoresFinales().contains(valorEnd)) {
+                    errores.add("El evento de fin '" + label(endEvent)
+                            + "' debe llamarse 'Aprobado', 'Rechazado' o 'Cancelado'");
+                }
+            }
+
         } catch (Exception e) {
             errores.add("El XML no es un BPMN válido: " + e.getMessage());
         }
@@ -286,6 +312,16 @@ public class BpmnParserService {
 
     public String inyectarCondiciones(String xml) {
         Document doc = parsearXml(xml);
+
+        // Solo las salidas de un exclusiveGateway son DECISIONES (llevan ${accion == 'valor'}).
+        // Cualquier otra flecha con nombre (secuencial/paralela, o con un name viejo) NO recibe
+        // condicion: avanza directo. Asi un nombre viejo en una flecha secuencial NO atasca el flujo.
+        Set<String> exclusiveGateways = new HashSet<>();
+        NodeList gws = doc.getElementsByTagNameNS("*", "exclusiveGateway");
+        for (int i = 0; i < gws.getLength(); i++) {
+            exclusiveGateways.add(((Element) gws.item(i)).getAttribute("id"));
+        }
+
         NodeList flujos = doc.getElementsByTagNameNS("*", "sequenceFlow");
 
         for (int i = 0; i < flujos.getLength(); i++) {
@@ -293,6 +329,7 @@ public class BpmnParserService {
             String nombre = flow.getAttribute("name");
 
             if (nombre.isBlank()) continue;
+            if (!exclusiveGateways.contains(flow.getAttribute("sourceRef"))) continue;
             if (flow.getElementsByTagNameNS("*", "conditionExpression").getLength() > 0) continue;
 
             String valor = normalizarValor(nombre, flow.getAttribute("id"));
@@ -348,7 +385,7 @@ public class BpmnParserService {
             mapa.computeIfAbsent(sourceRef, k -> new ArrayList<>())
                     .add(TransicionFlujo.builder()
                             .targetId(targetRef)
-                            .etiqueta(etiqueta.isBlank() ? null : etiqueta)
+                            .etiqueta(etiqueta.isBlank() ? "Continuar" : etiqueta)
                             .valor(normalizarValor(etiqueta, flowId))
                             .build());
         }
@@ -364,7 +401,10 @@ public class BpmnParserService {
     }
 
     private String normalizarValor(String etiqueta, String flowId) {
-        if (etiqueta == null || etiqueta.isBlank()) return flowId;
+        // Sin "name" = flecha SECUENCIAL/paralela (no es una decision del usuario). Devolvemos
+        // "avanzar" (no el flowId feo): el funcionario ve "Continuar" y completa. Camunda NO le pone
+        // condicion a estas flechas (inyectarCondiciones las salta), asi que "avanzar" no se evalua.
+        if (etiqueta == null || etiqueta.isBlank()) return "avanzar";
         return etiqueta.trim().toLowerCase()
                 .replace("á", "a").replace("é", "e").replace("í", "i")
                 .replace("ó", "o").replace("ú", "u").replace("ü", "u")

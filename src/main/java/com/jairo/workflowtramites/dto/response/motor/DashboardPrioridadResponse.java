@@ -12,6 +12,7 @@ public class DashboardPrioridadResponse {
     private int totalConPrioridadMedia;
     private int totalConPrioridadBaja;
     private List<ItemPrioridadResponse> topUrgentes;
+    private String resumen;        // texto legible que arma el motor (para que el front lo muestre directo)
     private boolean disponible;
 
     public static DashboardPrioridadResponse noDisponible() {

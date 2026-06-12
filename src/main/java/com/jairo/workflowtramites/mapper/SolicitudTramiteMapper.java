@@ -25,7 +25,6 @@ public class SolicitudTramiteMapper {
                 .fechaFinalizacion(s.getFechaFinalizacion())
                 .respuestasSolicitante(s.getRespuestasSolicitante())
                 .respuestasPorDepartamento(s.getRespuestasPorDepartamento())
-                .adjuntos(s.getAdjuntos())
                 .fechaLimite(s.getFechaLimite())
                 .estadoSla(s.getEstadoSla())
                 .build();
@@ -60,11 +59,11 @@ public class SolicitudTramiteMapper {
     public static SolicitudTramite toModel(SolicitudTramiteRequest r, String solicitanteId) {
         return SolicitudTramite.builder()
                 .tramiteId(r.getTramiteId())
+                .clientId(r.getClientId())
                 .solicitanteId(solicitanteId)
                 .estado(EstadoTramite.PENDIENTE)
                 .respuestasSolicitante(r.getRespuestas() != null ? r.getRespuestas() : new ArrayList<>())
                 .respuestasPorDepartamento(new ArrayList<>())
-                .adjuntos(r.getAdjuntos() != null ? new ArrayList<>(r.getAdjuntos()) : new ArrayList<>())
                 .build();
     }
 }

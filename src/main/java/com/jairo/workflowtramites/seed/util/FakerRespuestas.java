@@ -1,6 +1,5 @@
 package com.jairo.workflowtramites.seed.util;
 
-import com.jairo.workflowtramites.model.embeds.Adjunto;
 import com.jairo.workflowtramites.model.embeds.CampoFormulario;
 import com.jairo.workflowtramites.model.embeds.RespuestaCampo;
 import lombok.RequiredArgsConstructor;
@@ -8,7 +7,6 @@ import net.datafaker.Faker;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -16,7 +14,7 @@ import java.util.Random;
 import java.util.UUID;
 
 /**
- * Genera respuestas y adjuntos fake para los formularios del seeder.
+ * Genera respuestas fake para los formularios del seeder.
  *
  * Orden de prioridad al generar un valor TEXT/TEXTAREA:
  *   1. Heurística por nombre del campo → CatalogoRespuestas (listas realistas,
@@ -42,20 +40,6 @@ public class FakerRespuestas {
                     .build());
         }
         return respuestas;
-    }
-
-    public List<Adjunto> generarAdjuntos(List<String> requisitos) {
-        if (requisitos == null || requisitos.isEmpty()) return new ArrayList<>();
-        List<Adjunto> adjuntos = new ArrayList<>(requisitos.size());
-        for (String requisito : requisitos) {
-            adjuntos.add(Adjunto.builder()
-                    .nombre(requisito + ".pdf")
-                    .url(urlFake())
-                    .tipo("application/pdf")
-                    .fechaSubida(LocalDateTime.now())
-                    .build());
-        }
-        return adjuntos;
     }
 
     public String generarComentario() {

@@ -14,6 +14,7 @@ import com.jairo.workflowtramites.model.FlujoTrabajo;
 import com.jairo.workflowtramites.model.SolicitudTramite;
 import com.jairo.workflowtramites.model.Tramite;
 import com.jairo.workflowtramites.model.embeds.RespuestaDepartamento;
+import com.jairo.workflowtramites.model.enums.AccionFlujo;
 import com.jairo.workflowtramites.model.enums.EstadoFlujo;
 import com.jairo.workflowtramites.model.enums.EstadoSla;
 import com.jairo.workflowtramites.model.enums.EstadoTramite;
@@ -120,6 +121,15 @@ public class SolicitudTramiteService {
     }
 
     public SolicitudTramiteResponse crear(SolicitudTramiteRequest request, String solicitanteId) {
+        // Idempotencia: si el cliente (movil offline) reintenta con el mismo clientId,
+        // devolvemos la solicitud ya creada en vez de duplicarla.
+        if (request.getClientId() != null && !request.getClientId().isBlank()) {
+            var existente = solicitudTramiteRepository.findFirstByClientId(request.getClientId());
+            if (existente.isPresent()) {
+                return SolicitudTramiteMapper.toResponse(existente.get());
+            }
+        }
+
         SolicitudTramite solicitud = SolicitudTramiteMapper.toModel(request, solicitanteId);
 
         Tramite tramite = tramiteService.obtenerEntidad(request.getTramiteId());
@@ -231,7 +241,6 @@ public class SolicitudTramiteService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada: " + id));
 
         existente.setRespuestasSolicitante(request.getRespuestas());
-        existente.setAdjuntos(request.getAdjuntos());
 
         return SolicitudTramiteMapper.toResponse(solicitudTramiteRepository.save(existente));
     }
@@ -263,6 +272,7 @@ public class SolicitudTramiteService {
         entrada.setFuncionarioId(entrada.getFuncionarioAsignadoId());
         entrada.setFuncionarioNombre(entrada.getFuncionarioAsignadoNombre());
         entrada.setAccion(request.getAccion());
+        entrada.setAccionEtiqueta(AccionFlujo.etiquetaDe(request.getAccion()));
         entrada.setComentario(request.getComentario());
         entrada.setFechaRespuesta(ahora);
         entrada.setRespuestas(request.getRespuestas());

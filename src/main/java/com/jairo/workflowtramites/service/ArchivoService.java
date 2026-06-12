@@ -60,13 +60,29 @@ public class ArchivoService {
     public Archivo subir(MultipartFile archivo,
                          String solicitudId,
                          String campoFormulario,
-                         String departamentoOrigenId) {
+                         String departamentoOrigenId,
+                         String clientId) {
+        // Idempotencia: si el cliente (movil offline) reintenta con el mismo clientId,
+        // devolvemos el archivo ya subido en vez de duplicarlo.
+        if (clientId != null && !clientId.isBlank()) {
+            var existente = archivoRepository.findFirstByClientId(clientId);
+            if (existente.isPresent()) {
+                return existente.get();
+            }
+        }
         validarArchivo(archivo);
 
         SolicitudTramite solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada: " + solicitudId));
 
         AuthenticatedUser usuario = usuarioActual();
+
+        // Control server-side de quién puede SUBIR a este slot (el front además oculta el botón).
+        NodoFlujo nodo = encontrarNodo(solicitud, departamentoOrigenId, campoFormulario);
+        DocumentoConfig docConfig = encontrarDocumentoConfig(nodo, campoFormulario);
+        if (!permisoArchivoService.puedeSubir(usuario, docConfig, solicitud)) {
+            throw new RuntimeException("No tiene permiso para subir este documento");
+        }
 
         String nombreOriginal = archivo.getOriginalFilename() != null ? archivo.getOriginalFilename() : "archivo";
         String formato = extraerExtension(nombreOriginal);
@@ -79,12 +95,11 @@ public class ArchivoService {
             throw new RuntimeException("Error al subir archivo a S3: " + e.getMessage(), e);
         }
 
-        NodoFlujo nodo = encontrarNodo(solicitud, departamentoOrigenId, campoFormulario);
-        DocumentoConfig docConfig = encontrarDocumentoConfig(nodo, campoFormulario);
         PermisoSet permisos = derivarPermisos(nodo, docConfig);
 
         Archivo nuevo = Archivo.builder()
                 .id(archivoId)
+                .clientId(clientId)
                 .solicitudId(solicitudId)
                 .politicaId(solicitud.getTramiteId())
                 .clienteId(solicitud.getSolicitanteId())

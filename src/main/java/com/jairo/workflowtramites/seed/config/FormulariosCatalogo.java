@@ -52,16 +52,14 @@ public class FormulariosCatalogo {
                 date("fechaEsperada", "Fecha esperada de egresamiento", true),
                 number("promedioObtenido", "Promedio obtenido", true),
                 select("cumplePracticas", "¿Cumple prácticas preprofesionales?", true,
-                        List.of("Sí", "No", "En curso")),
-                file("actaPracticas", "Acta de prácticas (si aplica)", false)
+                        List.of("Sí", "No", "En curso"))
         ));
 
         catalogo.put("Datos de titulacion", List.of(
                 select("modalidad", "Modalidad de titulación", true,
                         List.of("Tesis", "Examen complexivo", "Proyecto integrador")),
                 text("tituloTrabajo", "Título del trabajo", true),
-                text("tutor", "Tutor académico", true),
-                file("documentoPropuesta", "Documento de propuesta", true)
+                text("tutor", "Tutor académico", true)
         ));
 
         catalogo.put("Datos de solicitud de beca", List.of(
@@ -71,15 +69,12 @@ public class FormulariosCatalogo {
                 number("numeroDependientes", "Número de dependientes", true),
                 select("tipoVivienda", "Tipo de vivienda", true,
                         List.of("Propia", "Arrendada", "Familiar")),
-                file("documentosIngresos", "Documentos de ingresos", true),
                 textarea("descripcionSituacion", "Descripción de la situación", false)
         ));
 
         catalogo.put("Datos de convalidacion", List.of(
                 text("universidadOrigen", "Universidad de origen", true),
-                textarea("materiasConvalidar", "Materias a convalidar", true),
-                file("certificadoNotasOrigen", "Certificado de notas de la universidad de origen", true),
-                file("syllabusOrigen", "Syllabus de las materias a convalidar", true)
+                textarea("materiasConvalidar", "Materias a convalidar", true)
         ));
 
         catalogo.put("Datos de retiro de materia", List.of(
@@ -94,7 +89,6 @@ public class FormulariosCatalogo {
                 date("fechaFalta", "Fecha de la falta", true),
                 select("motivo", "Motivo", true,
                         List.of("Médico", "Familiar", "Laboral", "Otro")),
-                file("certificadoRespaldo", "Certificado de respaldo", true),
                 textarea("descripcion", "Descripción detallada", false)
         ));
 
@@ -116,8 +110,7 @@ public class FormulariosCatalogo {
                 text("temaInvestigacion", "Tema de investigación", true),
                 text("director", "Director de investigación", true),
                 date("fechaInicio", "Fecha de inicio", true),
-                date("fechaFin", "Fecha estimada de finalización", true),
-                file("propuesta", "Documento de propuesta", true)
+                date("fechaFin", "Fecha estimada de finalización", true)
         ));
     }
 
@@ -137,15 +130,13 @@ public class FormulariosCatalogo {
         catalogo.put("Dictamen del decano", List.of(
                 select("decision", "Decisión", true,
                         List.of("Aprobado", "Rechazado", "Devuelto para correcciones")),
-                textarea("justificacion", "Justificación de la decisión", true),
-                file("actaFirmada", "Acta firmada (si aplica)", false)
+                textarea("justificacion", "Justificación de la decisión", true)
         ));
 
         catalogo.put("Evaluacion socioeconomica", List.of(
                 select("nivelSocioeconomico", "Nivel socioeconómico", true,
                         List.of("A", "B", "C", "D", "E")),
                 number("porcentajeBeca", "Porcentaje de beca recomendado (%)", true),
-                file("informeVisita", "Informe de visita (si aplica)", false),
                 textarea("observaciones", "Observaciones", false)
         ));
 
@@ -174,7 +165,6 @@ public class FormulariosCatalogo {
                 select("comiteAprobo", "¿El comité aprobó?", true,
                         List.of("Sí", "No", "Con observaciones")),
                 date("fechaReunion", "Fecha de reunión del comité", true),
-                file("actaComite", "Acta del comité", true),
                 textarea("observaciones", "Observaciones del comité", false)
         ));
 
@@ -241,11 +231,5 @@ public class FormulariosCatalogo {
                 .nombre(nombre).etiqueta(etiqueta)
                 .tipo(TipoCampo.SELECT).requerido(requerido)
                 .opciones(opciones).build();
-    }
-
-    private CampoFormulario file(String nombre, String etiqueta, boolean requerido) {
-        return CampoFormulario.builder()
-                .nombre(nombre).etiqueta(etiqueta)
-                .tipo(TipoCampo.FILE).requerido(requerido).build();
     }
 }

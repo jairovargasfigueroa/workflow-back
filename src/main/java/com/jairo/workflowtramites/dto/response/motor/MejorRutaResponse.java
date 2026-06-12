@@ -11,6 +11,7 @@ public class MejorRutaResponse {
     private String flujoId;
     private List<RutaPredichaResponse> rutas;
     private String rutaRecomendadaNombre;
+    private String resumen;        // texto legible que arma el motor (para que el front lo muestre directo)
     private boolean disponible;
 
     public static MejorRutaResponse noDisponible(String flujoId) {

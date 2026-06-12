@@ -42,6 +42,15 @@ public class GlobalExceptionHandler {
                 .body(Map.of("errores", errores));
     }
 
+    // Errores de INFRAESTRUCTURA (Mongo/DB caido, etc.) -> 503 TRANSITORIO.
+    // El cliente (movil offline) puede REINTENTAR estos. Va antes de RuntimeException (mas especifico).
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public ResponseEntity<Map<String, String>> handleInfraestructura(org.springframework.dao.DataAccessException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("error", "Servicio temporalmente no disponible. Reintente."));
+    }
+
+    // Errores de NEGOCIO/validacion -> 400 PERMANENTE. El cliente NO debe reintentar (mostrar el motivo).
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> handleRuntime(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

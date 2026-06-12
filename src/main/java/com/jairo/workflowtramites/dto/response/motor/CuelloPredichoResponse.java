@@ -11,4 +11,6 @@ public class CuelloPredichoResponse {
     private String departamentoId;
     private Double probabilidad;
     private String cuando;
+    private String nivelRiesgo;    // "ALTO" / "MEDIO" — texto legible del motor
+    private String razon;          // por qué es un cuello — texto legible del motor
 }

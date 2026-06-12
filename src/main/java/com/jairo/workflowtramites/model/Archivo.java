@@ -31,6 +31,10 @@ public class Archivo extends AuditableDocument {
     @Indexed
     private String clienteId;
 
+    // Idempotencia: UUID del cliente (movil offline) para deduplicar reintentos de subida.
+    @Indexed
+    private String clientId;
+
     private String nombre;
     private String formato;
     private Long tamanoBytes;

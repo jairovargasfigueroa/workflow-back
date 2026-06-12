@@ -1,6 +1,5 @@
 package com.jairo.workflowtramites.dto.request;
 
-import com.jairo.workflowtramites.model.embeds.Adjunto;
 import com.jairo.workflowtramites.model.embeds.RespuestaCampo;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -19,5 +18,6 @@ public class SolicitudTramiteRequest {
 
     private List<RespuestaCampo> respuestas;
 
-    private List<Adjunto> adjuntos;
+    // Idempotencia: UUID que el cliente (movil offline) manda por operacion para deduplicar reintentos.
+    private String clientId;
 }

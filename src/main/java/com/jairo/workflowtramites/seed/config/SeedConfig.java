@@ -1,5 +1,6 @@
 package com.jairo.workflowtramites.seed.config;
 
+import com.jairo.workflowtramites.model.enums.CategoriaCriticidad;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -19,8 +20,27 @@ public class SeedConfig {
     /** Cantidad de admins a generar. */
     private int admins = 5;
 
-    /** Cantidad de funcionarios a generar por cada departamento. */
+    /** Cantidad de funcionarios por departamento (fallback si el depto no está en el mapa de abajo). */
     private int funcionariosPorDepartamento = 5;
+
+    /**
+     * Funcionarios por departamento VARIABLE → crea variedad de presión de recursos
+     * (solicitudes activas ÷ funcionarios) para que el motor aprenda prioridad "resource-aware".
+     * Saturados = pocos funcionarios donde hay mucha carga (Secretaria/Tesoreria salen en casi
+     * todos los flujos); relajados = muchos funcionarios con poca carga (Investigacion/Bienestar).
+     */
+    private Map<String, Integer> funcionariosPorDepto = Map.ofEntries(
+            Map.entry("Secretaria Academica",  3),   // alta carga -> SATURADO
+            Map.entry("Tesoreria",             2),   // carga media, pocos -> SATURADO
+            Map.entry("Registro",              3),
+            Map.entry("Decanato",              4),
+            Map.entry("Financiero",            4),
+            Map.entry("Biblioteca",            5),
+            Map.entry("Direccion de Carrera",  6),
+            Map.entry("Posgrado",              6),
+            Map.entry("Bienestar Estudiantil", 7),   // poca carga -> relajado
+            Map.entry("Investigacion",         8)    // poca carga -> MUY relajado
+    );
 
     /** Cantidad de solicitantes a generar. */
     private int solicitantes = 250;
@@ -173,6 +193,47 @@ public class SeedConfig {
             Map.entry("Direccion de Carrera",  new ConfigDepto(60, 36 * 60,   120, 20 * 60,  0.08, 0.05))
     );
 
+    /** Etiquetas por trámite: palabras clave que usa el AGENTE inteligente para decidir
+     *  qué política de negocio corresponde a lo que describe el cliente. */
+    private Map<String, List<String>> etiquetasPorTramite = Map.ofEntries(
+            Map.entry("Solicitud de certificado de notas", List.of("certificado", "notas", "calificaciones", "record academico", "promedio")),
+            Map.entry("Solicitud de egresamiento",         List.of("egreso", "egresamiento", "culminacion", "fin de carrera")),
+            Map.entry("Tramite de titulacion",             List.of("titulo", "titulacion", "grado", "tesis", "graduacion")),
+            Map.entry("Solicitud de beca",                 List.of("beca", "ayuda economica", "socioeconomico", "financiamiento", "descuento")),
+            Map.entry("Convalidacion de materias",         List.of("convalidacion", "homologacion", "equivalencia", "traslado", "materias")),
+            Map.entry("Retiro de materia",                 List.of("retiro", "baja", "materia", "abandono")),
+            Map.entry("Justificacion de falta",            List.of("justificacion", "falta", "inasistencia", "permiso medico")),
+            Map.entry("Cambio de carrera",                 List.of("cambio de carrera", "traslado interno", "reorientacion")),
+            Map.entry("Carta de honorabilidad",            List.of("honorabilidad", "buena conducta", "comportamiento", "certificado")),
+            Map.entry("Permiso de investigacion",          List.of("investigacion", "permiso", "proyecto", "estudio"))
+    );
+
+    /** SLA por trámite: plazo objetivo y máximo en HORAS + criticidad (para el motor de riesgo). */
+    public record SlaTramite(int objetivoHoras, int maximoHoras, CategoriaCriticidad criticidad) {}
+
+    private Map<String, SlaTramite> slaPorTramite = Map.ofEntries(
+            Map.entry("Solicitud de certificado de notas", new SlaTramite(48, 72, CategoriaCriticidad.RUTINARIO)),
+            Map.entry("Solicitud de egresamiento",         new SlaTramite(120, 240, CategoriaCriticidad.IMPORTANTE)),
+            Map.entry("Tramite de titulacion",             new SlaTramite(168, 336, CategoriaCriticidad.CRITICO)),
+            Map.entry("Solicitud de beca",                 new SlaTramite(120, 240, CategoriaCriticidad.IMPORTANTE)),
+            Map.entry("Convalidacion de materias",         new SlaTramite(96, 168, CategoriaCriticidad.IMPORTANTE)),
+            Map.entry("Retiro de materia",                 new SlaTramite(48, 96, CategoriaCriticidad.RUTINARIO)),
+            Map.entry("Justificacion de falta",            new SlaTramite(12, 24, CategoriaCriticidad.EMERGENCIA)),
+            Map.entry("Cambio de carrera",                 new SlaTramite(120, 240, CategoriaCriticidad.IMPORTANTE)),
+            Map.entry("Carta de honorabilidad",            new SlaTramite(48, 72, CategoriaCriticidad.RUTINARIO)),
+            Map.entry("Permiso de investigacion",          new SlaTramite(96, 168, CategoriaCriticidad.IMPORTANTE))
+    );
+
+    /** Umbral de alerta (% del plazo objetivo a partir del cual el SLA entra en riesgo). */
+    private int umbralAlertaPorcentaje = 80;
+
+    // ── Anomalías (para que el motor de deep learning detecte outliers) ───────────
+    /** Fracción de solicitudes que serán anómalas (lentas o rápidas). 0.07 = 7%. */
+    private double porcentajeAnomalias = 0.07;
+    /** Factor de demora extrema (multiplica el trabajo de UN nodo) para las anomalías LENTAS = cuello. */
+    private int factorAnomaliaLentaMin = 5;
+    private int factorAnomaliaLentaMax = 10;
+
     public int getCantidadSolicitudes()        { return cantidadSolicitudes; }
     public void setCantidadSolicitudes(int v)  { this.cantidadSolicitudes = v; }
     public int getDistribuirUltimosDias()      { return distribuirUltimosDias; }
@@ -181,6 +242,8 @@ public class SeedConfig {
     public void setAdmins(int v)               { this.admins = v; }
     public int getFuncionariosPorDepartamento(){ return funcionariosPorDepartamento; }
     public void setFuncionariosPorDepartamento(int v) { this.funcionariosPorDepartamento = v; }
+    public Map<String, Integer> getFuncionariosPorDepto() { return funcionariosPorDepto; }
+    public void setFuncionariosPorDepto(Map<String, Integer> v) { this.funcionariosPorDepto = v; }
     public int getSolicitantes()               { return solicitantes; }
     public void setSolicitantes(int v)         { this.solicitantes = v; }
     public List<String> getDepartamentos()     { return departamentos; }
@@ -193,4 +256,16 @@ public class SeedConfig {
     public void setRequisitosPorTramite(Map<String, List<String>> v) { this.requisitosPorTramite = v; }
     public Map<String, ConfigDepto> getConfigPorDepto() { return configPorDepto; }
     public void setConfigPorDepto(Map<String, ConfigDepto> v) { this.configPorDepto = v; }
+    public Map<String, List<String>> getEtiquetasPorTramite() { return etiquetasPorTramite; }
+    public void setEtiquetasPorTramite(Map<String, List<String>> v) { this.etiquetasPorTramite = v; }
+    public Map<String, SlaTramite> getSlaPorTramite() { return slaPorTramite; }
+    public void setSlaPorTramite(Map<String, SlaTramite> v) { this.slaPorTramite = v; }
+    public int getUmbralAlertaPorcentaje() { return umbralAlertaPorcentaje; }
+    public void setUmbralAlertaPorcentaje(int v) { this.umbralAlertaPorcentaje = v; }
+    public double getPorcentajeAnomalias() { return porcentajeAnomalias; }
+    public void setPorcentajeAnomalias(double v) { this.porcentajeAnomalias = v; }
+    public int getFactorAnomaliaLentaMin() { return factorAnomaliaLentaMin; }
+    public void setFactorAnomaliaLentaMin(int v) { this.factorAnomaliaLentaMin = v; }
+    public int getFactorAnomaliaLentaMax() { return factorAnomaliaLentaMax; }
+    public void setFactorAnomaliaLentaMax(int v) { this.factorAnomaliaLentaMax = v; }
 }

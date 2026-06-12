@@ -15,7 +15,6 @@ import java.util.List;
 public class DocumentoConfig {
 
     private String nombre;
-    private String campoFormularioAsociado;
 
     @Builder.Default
     private List<String> formatosAceptados = new ArrayList<>();

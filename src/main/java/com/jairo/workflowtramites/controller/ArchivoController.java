@@ -40,9 +40,10 @@ public class ArchivoController {
             @RequestPart("archivo") MultipartFile archivo,
             @RequestParam("solicitudId") String solicitudId,
             @RequestParam(value = "campoFormulario", required = false) String campoFormulario,
-            @RequestParam(value = "departamentoOrigenId", required = false) String departamentoOrigenId) {
+            @RequestParam(value = "departamentoOrigenId", required = false) String departamentoOrigenId,
+            @RequestParam(value = "clientId", required = false) String clientId) {
 
-        var creado = archivoService.subir(archivo, solicitudId, campoFormulario, departamentoOrigenId);
+        var creado = archivoService.subir(archivo, solicitudId, campoFormulario, departamentoOrigenId, clientId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ArchivoMapper.toResponse(creado));
     }
 

@@ -45,41 +45,64 @@ public class RedistribuidorFechas {
 
         Map<String, ConfigDepto> configs = seedConfig.getConfigPorDepto();
         int dias = Math.max(1, seedConfig.getDistribuirUltimosDias());
+        double porcentajeAnomalias = seedConfig.getPorcentajeAnomalias();
+        int factorMin = seedConfig.getFactorAnomaliaLentaMin();
+        int factorMax = seedConfig.getFactorAnomaliaLentaMax();
         LocalDateTime ahora = LocalDateTime.now();
 
         List<SolicitudTramite> todas = solicitudRepo.findAll();
-        int actualizadas = 0;
+        int actualizadas = 0, lentas = 0, rapidas = 0;
 
         for (SolicitudTramite s : todas) {
-            LocalDateTime fechaCreacion = ahora
-                    .minusDays(random.nextInt(dias))
-                    .minusHours(random.nextInt(24))
-                    .minusMinutes(random.nextInt(60));
+            // ¿Esta solicitud es ANÓMALA? (para que el motor detecte outliers). NO marcamos
+            // ningún flag "esAnomala" en la entidad: el escenario está en los TIEMPOS, el micro
+            // (deep learning no supervisado) los descubre solo.
+            boolean esAnomala = random.nextDouble() < porcentajeAnomalias;
+            boolean esLenta   = esAnomala && random.nextBoolean();  // cuello extremo en un nodo
+            boolean esRapida  = esAnomala && !esLenta;               // procesada en tiempo mínimo
+
+            // Las LENTAS arrancan más atrás para que la demora extrema "quepa" antes de ahora.
+            LocalDateTime fechaCreacion = esLenta
+                    ? ahora.minusDays(dias / 2 + random.nextInt(Math.max(1, dias / 2)))
+                           .minusHours(random.nextInt(24))
+                    : ahora.minusDays(random.nextInt(dias))
+                           .minusHours(random.nextInt(24))
+                           .minusMinutes(random.nextInt(60));
 
             s.setFechaCreacion(fechaCreacion);
 
+            // En una solicitud lenta, UN nodo al azar concentra la demora extrema (el cuello).
+            List<RespuestaDepartamento> respuestas = s.getRespuestasPorDepartamento();
+            int nodoCuello = (esLenta && !respuestas.isEmpty()) ? random.nextInt(respuestas.size()) : -1;
+
             LocalDateTime cursor = fechaCreacion;
-            for (RespuestaDepartamento r : s.getRespuestasPorDepartamento()) {
+            int idx = 0;
+            for (RespuestaDepartamento r : respuestas) {
                 String nombreDepto = deptoIdANombre.get(r.getDepartamentoId());
                 ConfigDepto cfg = configs.getOrDefault(nombreDepto, CONFIG_POR_DEFECTO);
 
                 r.setFechaEntrada(cursor);
 
                 if (r.getFechaAsignacion() != null) {
-                    LocalDateTime asignacion = cursor.plusMinutes(
-                            aleatorio(cfg.bandejaMinutosMin(), cfg.bandejaMinutosMax()));
+                    int bandeja = esRapida ? cfg.bandejaMinutosMin()
+                            : aleatorio(cfg.bandejaMinutosMin(), cfg.bandejaMinutosMax());
+                    LocalDateTime asignacion = cursor.plusMinutes(bandeja);
                     if (asignacion.isAfter(ahora)) asignacion = ahora;
                     r.setFechaAsignacion(asignacion);
                     cursor = asignacion;
                 }
 
                 if (r.getFechaRespuesta() != null) {
-                    LocalDateTime respuesta = cursor.plusMinutes(
-                            aleatorio(cfg.trabajoMinutosMin(), cfg.trabajoMinutosMax()));
+                    int trabajo = esRapida ? cfg.trabajoMinutosMin()
+                            : aleatorio(cfg.trabajoMinutosMin(), cfg.trabajoMinutosMax());
+                    // El nodo cuello de una solicitud lenta tarda factorMin..factorMax veces lo normal.
+                    if (idx == nodoCuello) trabajo *= aleatorio(factorMin, factorMax + 1);
+                    LocalDateTime respuesta = cursor.plusMinutes(trabajo);
                     if (respuesta.isAfter(ahora)) respuesta = ahora;
                     r.setFechaRespuesta(respuesta);
                     cursor = respuesta;
                 }
+                idx++;
             }
 
             if (s.getFechaFinalizacion() != null) {
@@ -88,13 +111,16 @@ public class RedistribuidorFechas {
 
             solicitudRepo.save(s);
             actualizadas++;
+            if (esLenta) lentas++;
+            if (esRapida) rapidas++;
 
             if (actualizadas % 500 == 0) {
                 log.info("[RedistribuidorFechas] {} solicitudes reescritas", actualizadas);
             }
         }
 
-        log.info("[RedistribuidorFechas] Total: {}", actualizadas);
+        log.info("[RedistribuidorFechas] Total: {} (anomalías: {} lentas / cuello, {} rápidas)",
+                actualizadas, lentas, rapidas);
     }
 
     private int aleatorio(int min, int max) {

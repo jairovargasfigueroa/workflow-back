@@ -5,7 +5,6 @@ import com.jairo.workflowtramites.dto.response.SolicitudTramiteResponse;
 import com.jairo.workflowtramites.model.FormularioTemplate;
 import com.jairo.workflowtramites.model.Tramite;
 import com.jairo.workflowtramites.model.Usuario;
-import com.jairo.workflowtramites.model.embeds.Adjunto;
 import com.jairo.workflowtramites.model.embeds.CampoFormulario;
 import com.jairo.workflowtramites.model.embeds.RespuestaCampo;
 import com.jairo.workflowtramites.model.enums.Rol;
@@ -32,7 +31,6 @@ import java.util.stream.Collectors;
  *   2. Para cada solicitud:
  *        - elige trámite + solicitante al azar,
  *        - genera respuestas del formulario inicial con Faker,
- *        - genera adjuntos fake (URLs s3.fake) por cada requisito,
  *        - llama solicitudService.crear(...) y obtiene la solicitud viva,
  *        - decide destino (APROBADO / RECHAZADO / EN_PROCESO*)
  *        - delega el avance a AvanzadorFlujo.
@@ -103,12 +101,10 @@ public class SolicitudesSeeder {
 
             List<CampoFormulario> campos = camposPorTramite.getOrDefault(tramite.getId(), List.of());
             List<RespuestaCampo> respuestas = faker.generarRespuestas(campos);
-            List<Adjunto> adjuntos = faker.generarAdjuntos(tramite.getRequisitos());
 
             SolicitudTramiteRequest req = new SolicitudTramiteRequest();
             req.setTramiteId(tramite.getId());
             req.setRespuestas(respuestas);
-            req.setAdjuntos(adjuntos);
 
             try {
                 SolicitudTramiteResponse creada = solicitudService.crear(req, solicitante.getId());

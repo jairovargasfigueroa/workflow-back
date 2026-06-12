@@ -14,6 +14,12 @@ import java.util.List;
 @AllArgsConstructor
 public class PermisoSet {
 
+    // Quien puede SUBIR un archivo nuevo (la primera vez). Separado de editores (= MODIFICAR
+    // version). El docente los distingue: "algunos los van a poder subir, otros que no;
+    // los van a poder solo leer, los van a poder modificar".
+    @Builder.Default
+    private List<SujetoPermiso> subidores = new ArrayList<>();
+
     @Builder.Default
     private List<SujetoPermiso> lectores = new ArrayList<>();
 

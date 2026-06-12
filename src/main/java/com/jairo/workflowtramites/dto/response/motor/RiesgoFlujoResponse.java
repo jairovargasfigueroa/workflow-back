@@ -12,6 +12,7 @@ public class RiesgoFlujoResponse {
     private List<CuelloPredichoResponse> cuellosPredichos;
     private List<DemoraPredichaResponse> demorasPredichas;
     private Double cumplimientoSlaEsperado;
+    private String resumen;        // texto legible que arma el motor (para que el front lo muestre directo)
     private boolean disponible;
 
     public static RiesgoFlujoResponse noDisponible(String flujoId) {

@@ -6,8 +6,13 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SolicitudTramiteRepository extends MongoRepository<SolicitudTramite, String> {
+
+    /** Idempotencia: busca una solicitud por el clientId que mando el cliente (movil offline).
+     *  findFirst (no findBy) para tolerar duplicados historicos sin romper con "non unique". */
+    Optional<SolicitudTramite> findFirstByClientId(String clientId);
 
     List<SolicitudTramite> findByTramiteId(String tramiteId);
 

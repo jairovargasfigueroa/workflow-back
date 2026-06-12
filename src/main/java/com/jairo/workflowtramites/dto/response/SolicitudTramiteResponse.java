@@ -1,6 +1,5 @@
 package com.jairo.workflowtramites.dto.response;
 
-import com.jairo.workflowtramites.model.embeds.Adjunto;
 import com.jairo.workflowtramites.model.embeds.RespuestaCampo;
 import com.jairo.workflowtramites.model.embeds.RespuestaDepartamento;
 import com.jairo.workflowtramites.model.enums.EstadoSla;
@@ -27,7 +26,6 @@ public class SolicitudTramiteResponse {
     private LocalDateTime fechaFinalizacion;
     private List<RespuestaCampo> respuestasSolicitante;
     private List<RespuestaDepartamento> respuestasPorDepartamento;
-    private List<Adjunto> adjuntos;
 
     // SLA del trámite a nivel de solicitud
     private LocalDateTime fechaLimite;

@@ -1,6 +1,5 @@
 package com.jairo.workflowtramites.model;
 
-import com.jairo.workflowtramites.model.embeds.Adjunto;
 import com.jairo.workflowtramites.model.embeds.RespuestaCampo;
 import com.jairo.workflowtramites.model.embeds.RespuestaDepartamento;
 import com.jairo.workflowtramites.model.enums.EstadoSla;
@@ -12,6 +11,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -36,6 +36,11 @@ public class SolicitudTramite extends AuditableDocument {
 
     @Id
     private String id;
+
+    // Idempotencia: UUID del cliente (movil offline) para deduplicar reintentos de creacion.
+    @Indexed
+    private String clientId;
+
     private String tramiteId;
     private String tramiteNombre;
     private String solicitanteId;
@@ -52,9 +57,6 @@ public class SolicitudTramite extends AuditableDocument {
 
     @Builder.Default
     private List<RespuestaDepartamento> respuestasPorDepartamento = new ArrayList<>();
-
-    @Builder.Default
-    private List<Adjunto> adjuntos = new ArrayList<>();
 
     // SLA del trámite a nivel de solicitud (calculado al crear, actualizado por SlaMonitorJob)
     private LocalDateTime fechaLimite;

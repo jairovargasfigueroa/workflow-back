@@ -25,6 +25,7 @@ public class RespuestaDepartamento {
     private String funcionarioAsignadoNombre;
     private LocalDateTime fechaAsignacion;
     private String accion;
+    private String accionEtiqueta;   // etiqueta legible de la accion para el historial ("Continuar", "Aprobado")
     private String comentario;
     private LocalDateTime fechaEntrada;
     private LocalDateTime fechaRespuesta;

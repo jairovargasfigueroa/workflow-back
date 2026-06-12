@@ -134,7 +134,9 @@ public class DatosMaestrosSeeder {
         List<String> ejemplos = new ArrayList<>();
         int total = 0;
         for (Departamento depto : deptos) {
-            for (int i = 0; i < seedConfig.getFuncionariosPorDepartamento(); i++) {
+            int cantidad = seedConfig.getFuncionariosPorDepto()
+                    .getOrDefault(depto.getNombre(), seedConfig.getFuncionariosPorDepartamento());
+            for (int i = 0; i < cantidad; i++) {
                 String nombre = faker.name().fullName();
                 String email = (nombre.replaceAll("[^A-Za-z]", "").toLowerCase()
                         + i + "@workflow.com");
@@ -289,15 +291,25 @@ public class DatosMaestrosSeeder {
 
             List<String> requisitos = seedConfig.getRequisitosPorTramite()
                     .getOrDefault(nombre, List.of("Copia de cedula"));
+            List<String> etiquetas = seedConfig.getEtiquetasPorTramite()
+                    .getOrDefault(nombre, List.of());
+            SeedConfig.SlaTramite sla = seedConfig.getSlaPorTramite().get(nombre);
 
-            creados.add(tramiteRepository.save(Tramite.builder()
+            Tramite.TramiteBuilder builder = Tramite.builder()
                     .nombre(nombre)
                     .descripcion("Trámite: " + nombre)
                     .formularioSolicitanteId(formSolic.getId())
                     .flujoTrabajoId(flujo.getId())
                     .requisitos(new ArrayList<>(requisitos))
-                    .activo(true)
-                    .build()));
+                    .etiquetas(new ArrayList<>(etiquetas))
+                    .activo(true);
+            if (sla != null) {
+                builder.plazoObjetivoHoras(sla.objetivoHoras())
+                        .plazoMaximoHoras(sla.maximoHoras())
+                        .umbralAlertaPorcentaje(seedConfig.getUmbralAlertaPorcentaje())
+                        .criticidad(sla.criticidad());
+            }
+            creados.add(tramiteRepository.save(builder.build()));
         }
         log.info("[DatosMaestros/Tramites] {} trámites creados:", creados.size());
         for (Tramite t : creados) {
