@@ -1,7 +1,9 @@
 package com.jairo.workflowtramites.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jairo.workflowtramites.model.embeds.CampoFormulario;
 import com.jairo.workflowtramites.model.embeds.ConfiguracionDocumental;
 import com.jairo.workflowtramites.model.embeds.NodoFlujo;
 import com.jairo.workflowtramites.model.embeds.TransicionFlujo;
@@ -37,6 +39,7 @@ public class BpmnParserService {
     private static final List<String> TIPOS_NODO = List.of("startEvent", "endEvent", "userTask", "exclusiveGateway", "parallelGateway");
     private static final String PROP_DEPARTAMENTO_ID = "departamentoId";
     private static final String PROP_CONFIGURACION_DOCUMENTAL = "configuracionDocumental";
+    private static final String PROP_CAMPOS_FORMULARIO = "camposFormulario";
     private static final String PROP_SLA_NODO_HORAS = "slaNodoHoras";
 
     // Tolerante a campos desconocidos en el JSON de configuracionDocumental
@@ -63,6 +66,7 @@ public class BpmnParserService {
                 String carrilId = null;
                 String carrilNombre = null;
                 ConfiguracionDocumental configuracionDocumental = null;
+                List<CampoFormulario> camposFormulario = null;
                 Integer slaNodoHoras = null;
 
                 InfoCarril infoCarril = carrilesPorNodo.get(elementId);
@@ -79,6 +83,7 @@ public class BpmnParserService {
                     }
                     formularioId = obtenerAtributoCamunda(el, "formKey");
                     configuracionDocumental = extraerConfiguracionDocumental(el);
+                    camposFormulario = extraerCamposFormulario(el);   // override inline (si el editor los puso en el XML)
                     slaNodoHoras = extraerSlaNodoHoras(el);
                 } else if ("startEvent".equals(tipo)) {
                     // El nodo inicial lleva los documentos que el SOLICITANTE sube al crear el
@@ -94,6 +99,7 @@ public class BpmnParserService {
                         .carrilId(carrilId)
                         .carrilNombre(carrilNombre)
                         .formularioId(formularioId)
+                        .camposFormulario(camposFormulario)
                         .configuracionDocumental(configuracionDocumental)
                         .slaNodoHoras(slaNodoHoras)
                         .transiciones(transicionesPorOrigen.getOrDefault(elementId, List.of()))
@@ -152,6 +158,23 @@ public class BpmnParserService {
             return objectMapper.readValue(json, ConfiguracionDocumental.class);
         } catch (Exception e) {
             log.warn("No se pudo deserializar configuracionDocumental del nodo '{}': {}",
+                    userTask.getAttribute("id"), e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Campos del formulario embebidos en el XML (override "inline"): el editor define/edita los
+     * campos en la config del nodo y los guarda como JSON en un camunda:property. Si estan, se usan
+     * tal cual (snapshot en la version); si no, FlujoTrabajoService copia los del FormularioTemplate.
+     */
+    private List<CampoFormulario> extraerCamposFormulario(Element userTask) {
+        String json = obtenerValorPropiedadCamunda(userTask, PROP_CAMPOS_FORMULARIO);
+        if (json == null || json.isBlank()) return null;
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<CampoFormulario>>() {});
+        } catch (Exception e) {
+            log.warn("No se pudo deserializar camposFormulario del nodo '{}': {}",
                     userTask.getAttribute("id"), e.getMessage());
             return null;
         }
@@ -217,8 +240,9 @@ public class BpmnParserService {
                 if (!tieneDeptoEnCarril && !tieneDeptoDirecto)
                     errores.add("La tarea '" + etiqueta + "' no tiene departamento asignado (ni por carril ni directo)");
 
-                if (obtenerAtributoCamunda(tarea, "formKey") == null)
-                    errores.add("La tarea '" + etiqueta + "' no tiene formulario asignado");
+                // El formulario puede venir por plantilla (formKey) O por campos inline en el XML.
+                if (obtenerAtributoCamunda(tarea, "formKey") == null && extraerCamposFormulario(tarea) == null)
+                    errores.add("La tarea '" + etiqueta + "' no tiene formulario asignado (ni plantilla ni campos)");
 
                 if (!elementosConEntrada.contains(elementId))
                     errores.add("La tarea '" + etiqueta + "' no está conectada al flujo");

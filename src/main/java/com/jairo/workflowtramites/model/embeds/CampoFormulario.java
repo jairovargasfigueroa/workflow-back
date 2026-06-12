@@ -18,5 +18,7 @@ public class CampoFormulario {
     private String etiqueta;
     private TipoCampo tipo;
     private boolean requerido;
-    private List<String> opciones;
+    private List<String> opciones;   // SELECT / RADIO / CHECKBOX: los valores a elegir
+    private List<String> columnas;   // TABLA: nombres de columnas · GRID: opciones por fila
+    private List<String> filas;      // GRID: las filas fijas (preguntas)
 }

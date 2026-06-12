@@ -124,7 +124,10 @@ public class FlujoTrabajoService {
         List<NodoFlujo> nodos = bpmnParserService.parsear(xmlFinal);
 
         for (NodoFlujo nodo : nodos) {
-            if ("userTask".equals(nodo.getTipo()) && nodo.getFormularioId() != null) {
+            // Si el editor edito los campos "inline" (ya vienen en el XML/nodo), se respetan.
+            // Si no, se copian del FormularioTemplate referenciado por el formKey (snapshot).
+            boolean tieneCamposInline = nodo.getCamposFormulario() != null && !nodo.getCamposFormulario().isEmpty();
+            if ("userTask".equals(nodo.getTipo()) && nodo.getFormularioId() != null && !tieneCamposInline) {
                 FormularioTemplate tpl = formularioTemplateRepository.findById(nodo.getFormularioId())
                         .orElseThrow(() -> new ValidacionBpmnException(List.of(
                                 "El formulario '" + nodo.getFormularioId() +
